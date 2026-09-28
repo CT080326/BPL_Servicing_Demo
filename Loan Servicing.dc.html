@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
+<script src="./data/lima-db.js"></script>
 </head>
 <body>
 <x-dc>
@@ -1359,6 +1360,20 @@
         </div>
         <sc-if value="{{ qEmpty }}"><div style="padding:32px;text-align:center;color:var(--muted-dark)">No rows match these filters.</div></sc-if>
       </div>
+      <sc-if value="{{ qLive }}">
+      <div class="sx-card" style="overflow:hidden">
+        <div class="sx-card-header"><h3 class="sx-card-title">SQL Console</h3><p class="sx-card-desc">Runs directly against the servicing database in your browser. Every table is available (loan, borrower, legal_entity, payment_transaction, servicing_task, risk_signal…). Changes last until you reload the page.</p></div>
+        <div class="sx-card-content" style="display:flex;flex-direction:column;gap:10px">
+          <textarea class="sx-input" value="{{ sqlText }}" onChange="{{ sqlSet }}" spellcheck="false" style="min-height:140px;height:auto;font:12px/1.6 ui-monospace,Menlo,monospace;padding:10px 12px;resize:vertical"></textarea>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <x-import component-from-global-scope="Button" variant="default" size="sm" onClick="{{ sqlRunGo }}" hint-size="90px,32px"><i class="ph ph-play"></i>Run SQL</x-import>
+            <x-import component-from-global-scope="Button" variant="outline" size="sm" onClick="{{ sqlReset }}" hint-size="150px,32px"><i class="ph ph-arrow-counter-clockwise"></i>Use Builder Query</x-import>
+            <span style="font-size:13px;color:{{ sqlMsgColor }}">{{ sqlMsg }}</span>
+          </div>
+        </div>
+        <sc-if value="{{ sqlHasRows }}"><div style="overflow:auto;max-height:420px"><table class="sx-table"><thead><tr><sc-for list="{{ sqlHdr }}" as="h"><th style="white-space:nowrap">{{ h.v }}</th></sc-for></tr></thead><tbody><sc-for list="{{ sqlRows }}" as="r"><tr><sc-for list="{{ r.cells }}" as="c"><td style="white-space:nowrap">{{ c.v }}</td></sc-for></tr></sc-for></tbody></table></div></sc-if>
+      </div>
+      </sc-if>
     </div>
   </div>
   </sc-if>
@@ -1443,8 +1458,29 @@ class Component extends DCLogic {
     v: { dashboard:'A', inbox:'A', loan:'A', borrower:'A', strategy:'A', payments:'A', escrow:'A', collections:'A', maturity:'A', remit:'A' },
     approvals: { 'BPL-100902':{ strategy:'Forbearance', date:'Jul 20, 2026', by:'R. Chen', baseline:1048000, projected:293440 }, 'BPL-101455':{ strategy:'Deed-in-Lieu', date:'Sep 18, 2026', by:'R. Chen', baseline:1188000, projected:807840 } },
     q: { ds:'loans', cols:null, filters:[], group:'', agg:'sum', sort:'upb', dir:'desc' }, saved: [], qName: '', hcfg: { thr:'1.20', buf:'0.10', occ:'10', exp:'15' }, scen: 'Modification', stratIn: {}, libSel: null, lossDim: 'month', lossFilter: null, relName: 'Aaron Wexler', relEntity: null, navCollapsed: false, loanId: 'BPL-104827', loanTab: 'overview', task: 'exceptions', typeFilter: 'All',
-    amt: '13485.00', extraPosted: [], resolved: {}, coll: 0, step: 1, pod: 20, toast: null
+    amt: '13485.00', extraPosted: [], resolved: {}, coll: 0, step: 1, pod: 20, toast: null,
+    dbStatus: (window.LimaDB && window.LimaDB.status) || 'missing', sqlText: null, sqlRun: null, sqlN: 0
   };
+
+  // ---- Live servicing database (PGlite in the browser, see data/lima-db.js) ----
+  _qc = {};
+  componentDidMount() { if (window.LimaDB) window.LimaDB.onChange(st => { if (st !== this.state.dbStatus) this.setState({ dbStatus:st }); }); }
+  dbq(sql, params, nonce) {
+    const key = sql + '\u0000' + JSON.stringify(params || []) + '\u0000' + (nonce || '');
+    if (this._qc[key]) return this._qc[key];
+    const e = { pending:true, rows:[], fields:[] };
+    if (!window.LimaDB || this.state.dbStatus !== 'ready') return e;
+    this._qc[key] = e;
+    const t0 = performance.now(), cv = v => typeof v === 'bigint' ? Number(v) : v;
+    window.LimaDB.query(sql, params).then(r => {
+      Object.assign(e, { pending:false, fields:(r.fields || []).map(f => f.name), rows:(r.rows || []).map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, cv(v)]))), affected:r.affectedRows, ms:Math.round(performance.now() - t0) });
+      this.forceUpdate();
+    }, err => { Object.assign(e, { pending:false, error:err.message || String(err) }); this.forceUpdate(); });
+    return e;
+  }
+  dbCount(ds) { const r = this.dbq('SELECT count(*) AS n FROM ' + ds); return r.pending || r.error ? '…' : r.rows[0].n.toLocaleString(); }
+  dbDistinct(ds, k) { return this.dbq('SELECT DISTINCT ' + k + ' AS v FROM ' + ds + ' WHERE ' + k + ' IS NOT NULL ORDER BY 1').rows.map(x => String(x.v)); }
+  cellText(v) { return v === null || v === undefined ? '—' : v instanceof Date ? v.toISOString().slice(0, 10) : typeof v === 'object' ? JSON.stringify(v) : String(v); }
 
   m(n, d = 2) { const s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); return (n < 0 ? '−$' : '$') + s; }
 
@@ -1750,6 +1786,8 @@ class Component extends DCLogic {
   }
   openHealth(l, src) { if (src) this._extra[l.id] = l; this.go('loan', { loanId:l.id, loanTab:'health', v:{ ...this.state.v, loan:'A' } }); }
   QPRE = [
+    { name:'Live DB · Delinquent UPB by State', q:{ ds:'db_loans', cols:['upb'], filters:[{ f:'status', op:'is not', v:'Current' }], group:'state', agg:'sum', sort:'upb', dir:'desc' } },
+    { name:'Live DB · Elevated Guarantor Concentration', q:{ ds:'db_borrowers', cols:null, filters:[{ f:'concentration', op:'is', v:'elevated' }], group:'', agg:'sum', sort:'upb', dir:'desc' } },
     { name:'Delinquent UPB by State', q:{ ds:'loans', cols:['upb','exposure'], filters:[{ f:'status', op:'is not', v:'Current' }], group:'state', agg:'sum', sort:'upb', dir:'desc' } },
     { name:'Loss Prevention by Analyst', q:{ ds:'resolved', cols:['baseline','actual','prevention'], filters:[], group:'analyst', agg:'sum', sort:'prevention', dir:'desc' } },
     { name:'Covenant Early Warnings', q:{ ds:'health', cols:null, filters:[{ f:'status', op:'is not', v:'Healthy' }], group:'', agg:'sum', sort:'dscr', dir:'asc' } },
@@ -2251,7 +2289,11 @@ class Component extends DCLogic {
         fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('draw','Draw #','num','int'),FD('date','Date','text'),FD('amount','Amount','num','$'),FD('pct','% Complete at Draw','num','int'),FD('budget','Budget','num','$'),FD('remaining','Holdback Remaining','num','$')] },
       health:{ label:'Property Health', icon:'heartbeat', desc:'DSCR loans with latest DSCR, occupancy and early-warning flags', def:['loan','borrower','dscr','occ','status','flags','summary'],
         rows:hLoans.map(l => { const H = this.healthCalc(l); return { loan:l.id, borrower:l.borrower, dscr:H.d[5], prior:H.d[4], occ:H.occP[5], status: H.breached ? 'Covenant breached' : H.flags.length ? 'Early warning' : 'Healthy', flags:H.flags.length, summary:H.flags.map(f => f.title).join('; ') || '—' }; }),
-        fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('dscr','DSCR','num','x'),FD('prior','Prior DSCR','num','x'),FD('occ','Occupancy %','num','int'),FD('status','Health Status','enum'),FD('flags','Flags','num','int'),FD('summary','Flag Summary','text')] }
+        fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('dscr','DSCR','num','x'),FD('prior','Prior DSCR','num','x'),FD('occ','Occupancy %','num','int'),FD('status','Health Status','enum'),FD('flags','Flags','num','int'),FD('summary','Flag Summary','text')] },
+      db_loans:{ live:true, label:'Servicing DB · Loans', icon:'database', desc:'Live query against the servicing database (lima-cap Postgres, running in your browser)', def:['loan','borrower','product','state','upb','status','dpd'], rows:[],
+        fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('borrower_type','Borrower Type','enum'),FD('guarantor','Guarantor','text'),FD('program','Program','enum'),FD('product','Product','enum'),FD('city','City','text'),FD('state','State','enum'),FD('property_type','Property Type','enum'),FD('note_amount','Note Amount','num','$'),FD('upb','UPB','num','$'),FD('rate','Rate','num','%'),FD('dpd','Days Past Due','num','int'),FD('status','Status','enum'),FD('investor','Investor','enum'),FD('maturity','Maturity','text'),FD('watchlist','Watchlist','enum'),FD('open_signals','Open Risk Signals','num','int')] },
+      db_borrowers:{ live:true, label:'Servicing DB · Borrowers', icon:'database', desc:'Every individual borrower or guarantor with exposure across all their entities (live query)', def:['name','loans','entities','upb','delinquent','concentration','location'], rows:[],
+        fields:[FD('name','Name','text'),FD('loans','Loans','num','int'),FD('entities','Entities','num','int'),FD('upb','UPB','num','$'),FD('delinquent','Delinquent Loans','num','int'),FD('concentration','Concentration','enum'),FD('location','Location','text'),FD('email','Email','text'),FD('contact_pref','Contact Preference','enum')] }
     };
     const q = DS[S.q.ds] ? S.q : { ...S.q, ds:'loans' }, D = DS[q.ds], FM = Object.fromEntries(D.fields.map(f => [f.k, f]));
     const cols = (q.cols || D.def).filter(k => FM[k]);
@@ -2296,10 +2338,56 @@ class Component extends DCLogic {
     const firstNum = d => (d.fields.find(f => f.t === 'num') || d.fields[0]).k;
     const csvEsc = v => { const t = String(v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
     const fileBase = (S.qName || D.label).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Live datasets: the builder's query runs as real SQL in the in-browser Postgres.
+    let live = {};
+    if (D.live) {
+      const P = [], ph = v => { P.push(v); return '$' + P.length; }, lit = v => "'" + String(v).replace(/'/g, "''") + "'";
+      const conds = [], shown = [];
+      q.filters.filter(fl => fl.v !== '' && FM[fl.f]).forEach(fl => { const f = FM[fl.f];
+        if (f.t === 'num') { const n = parseFloat(String(fl.v).replace(/[^0-9.\-]/g, '')); if (isNaN(n)) return; conds.push(fl.f + ' ' + opSql[fl.op] + ' ' + ph(n)); shown.push(fl.f + ' ' + opSql[fl.op] + ' ' + n); }
+        else if (fl.op === 'contains') { conds.push(fl.f + '::text ILIKE ' + ph('%' + fl.v + '%')); shown.push(fl.f + ' ILIKE ' + lit('%' + fl.v + '%')); }
+        else { const op = fl.op === 'is not' ? 'IS DISTINCT FROM' : '='; conds.push(fl.f + '::text ' + op + ' ' + ph(String(fl.v))); shown.push(fl.f + ' ' + op + ' ' + lit(fl.v)); } });
+      const aggFn = { sum:'SUM', avg:'AVG', count:'COUNT' }[q.agg];
+      const sel = grouped ? [q.group, 'COUNT(*) AS row_count', ...numCols.map(k => aggFn + '(' + k + ') AS ' + k)] : cols;
+      const ord = grouped ? (numCols.includes(q.sort) ? q.sort : q.sort === q.group ? q.group : 'row_count') : FM[q.sort] ? q.sort : null;
+      const head = 'SELECT ' + sel.join(', ') + '\nFROM ' + q.ds, tail = (grouped ? '\nGROUP BY ' + q.group : '') + (ord ? '\nORDER BY ' + ord + ' ' + q.dir.toUpperCase() + ' NULLS LAST' : '');
+      const sql = head + (conds.length ? '\nWHERE ' + conds.join('\n  AND ') : '') + tail, shownSql = head + (shown.length ? '\nWHERE ' + shown.join('\n  AND ') : '') + tail;
+      const r = this.dbq(sql, P), total = this.dbCount(q.ds), rows = r.rows;
+      let label;
+      if (grouped) {
+        const aggFmt = k => q.agg === 'count' ? { t:'num', fmt:'int' } : FM[k], pre = { sum:'Sum ', avg:'Avg ', count:'Count ' }[q.agg], nm = rows.reduce((t, x) => t + x.row_count, 0);
+        qRawHdr = [FM[q.group].label, 'Rows', ...numCols.map(k => pre + FM[k].label)];
+        qHdr = qRawHdr.map((v, i) => ({ v, al: i ? 'right' : 'left' }));
+        qOut = rows.map(x => ({ cells:[{ v:this.cellText(x[q.group]), al:'left' }, { v:String(x.row_count), al:'right' }, ...numCols.map(k => ({ v:fmtV(aggFmt(k), x[k]), al:'right' }))] }));
+        qRaw = rows.map(x => [x[q.group], x.row_count, ...numCols.map(k => x[k])]);
+        qTot = q.agg !== 'avg' && rows.length ? [{ v:'Total', al:'left' }, { v:String(nm), al:'right' }, ...numCols.map(k => ({ v:fmtV(aggFmt(k), rows.reduce((t, x) => t + (x[k] || 0), 0)), al:'right' }))] : null;
+        label = rows.length + ' groups from ' + nm.toLocaleString() + ' of ' + total + ' rows';
+      } else {
+        qRawHdr = cols.map(k => FM[k].label); qHdr = cols.map(k => ({ v:FM[k].label, al:al(FM[k]) }));
+        qOut = rows.slice(0, 50).map(x => ({ cells:cols.map(k => ({ v:fmtV(FM[k], x[k]), al:al(FM[k]) })) }));
+        qRaw = rows.map(x => cols.map(k => x[k] === null || x[k] === undefined ? '' : x[k]));
+        const sc = cols.map(k => FM[k].t === 'num' && (FM[k].fmt === '$' || FM[k].fmt === '$2'));
+        qTot = sc.some(Boolean) && rows.length ? cols.map((k, i) => ({ v: i === 0 ? 'Total' : sc[i] ? fmtV(FM[k], rows.reduce((t, x) => t + (x[k] || 0), 0)) : '', al:al(FM[k]) })) : null;
+        label = rows.length.toLocaleString() + ' of ' + total + ' rows' + (rows.length > 50 ? ' · showing first 50' : '');
+      }
+      const dbMsg = { loading:'Loading servicing database…', error:'Database failed to load: ' + ((window.LimaDB && window.LimaDB.error && window.LimaDB.error.message) || 'see console'), missing:'Database script not loaded (data/lima-db.js)' }[S.dbStatus];
+      live = { qText:shownSql, qEmpty: !dbMsg && !r.pending && !r.error && rows.length === 0,
+        qCount: dbMsg || (r.error ? 'Query error: ' + r.error : r.pending ? 'Running…' : label + ' · ' + r.ms + ' ms in Postgres') };
+      const sqlCur = S.sqlText === null ? shownSql : S.sqlText, sr = S.sqlRun ? this.dbq(S.sqlRun, [], S.sqlN) : null;
+      const sHdr = sr ? (sr.fields.length ? sr.fields : Object.keys(sr.rows[0] || {})) : [];
+      Object.assign(live, { qLive:true, sqlText:sqlCur, sqlSet: e => this.setState({ sqlText:e.target.value }),
+        sqlRunGo: () => { if (!sqlCur.trim()) return; this._qc = {}; this.setState(st => ({ sqlRun:sqlCur, sqlN:st.sqlN + 1 })); },
+        sqlReset: () => this.setState({ sqlText:null, sqlRun:null }),
+        sqlHdr: sHdr.map(v => ({ v })), sqlRows: sr ? sr.rows.slice(0, 200).map(x => ({ cells:sHdr.map(k => ({ v:this.cellText(x[k]) })) })) : [],
+        sqlHasRows: !!(sr && !sr.pending && !sr.error && sr.rows.length),
+        sqlMsg: dbMsg || (!sr ? 'Edit the query and run it. Any table works, e.g. SELECT * FROM servicing_task LIMIT 20' : sr.pending ? 'Running…' : sr.error ? 'Error: ' + sr.error
+          : (sr.rows.length ? sr.rows.length.toLocaleString() + ' rows' + (sr.rows.length > 200 ? ' · showing first 200' : '') : (sr.affected || 0) + ' rows affected') + ' · ' + sr.ms + ' ms'),
+        sqlMsgColor: sr && sr.error ? 'var(--destructive)' : 'var(--muted-dark)' });
+    }
     const qVals = {
       qSaved: [...this.QPRE, ...S.saved].map(r => ({ name:r.name, icon: r.view ? 'file-text' : r.user ? 'bookmark-simple' : 'table', sub: r.view ? 'Formatted report' : (DS[r.q.ds] ? DS[r.q.ds].label : '') + (r.user ? ' · saved today' : ''),
         go: () => r.view ? this.setV('remit', r.view) : this.setState({ q:{ ...r.q, filters:r.q.filters.map(f => ({ ...f })) }, qName: r.user ? r.name : '' }) })),
-      qSets: Object.entries(DS).map(([k, d]) => ({ label:d.label, icon:d.icon, n:String(d.rows.length), bl: k === q.ds ? 'var(--primary)' : 'transparent', bg: k === q.ds ? 'var(--primary-light)' : '#fff', fw: k === q.ds ? 600 : 400,
+      qSets: Object.entries(DS).map(([k, d]) => ({ label:d.label, icon:d.icon, n: d.live ? this.dbCount(k) : String(d.rows.length), bl: k === q.ds ? 'var(--primary)' : 'transparent', bg: k === q.ds ? 'var(--primary-light)' : '#fff', fw: k === q.ds ? 600 : 400,
         go: () => this.setState({ q:{ ds:k, cols:null, filters:[], group:'', agg:'sum', sort:firstNum(d), dir:'desc' }, qName:'' }) })),
       qDsLabel:D.label, qDsDesc:D.desc,
       qCols: D.fields.map(f => { const on = cols.includes(f.k); return { label:f.label, bg: on ? 'var(--tertiary)' : '#fff', fg: on ? '#fff' : 'var(--tertiary)', bd: on ? 'var(--tertiary)' : 'var(--border)',
@@ -2307,7 +2395,7 @@ class Component extends DCLogic {
       qFieldOpts: D.fields.map(f => ({ k:f.k, label:f.label })),
       qFilters: q.filters.map((fl, i) => { const f = FM[fl.f] || D.fields[0], upd = p => setQ({ filters: q.filters.map((x, j) => j === i ? { ...x, ...p } : x) });
         return { f:f.k, op:fl.op, v:fl.v, ops:OPS[f.t], isEnum: f.t === 'enum', notEnum: f.t !== 'enum', ph: f.t === 'num' ? 'Number' : 'Text',
-          vals:[...new Set(D.rows.map(r => r[f.k]).filter(v => v !== null && v !== undefined && v !== ''))].sort(),
+          vals: D.live ? (f.t === 'enum' ? this.dbDistinct(q.ds, f.k) : []) : [...new Set(D.rows.map(r => r[f.k]).filter(v => v !== null && v !== undefined && v !== ''))].sort(),
           setF: e => { const nf = FM[e.target.value]; upd({ f:e.target.value, op:OPS[nf.t][0], v:'' }); }, setOp: e => upd({ op:e.target.value }), setV: e => upd({ v:e.target.value }),
           remove: () => setQ({ filters: q.filters.filter((x, j) => j !== i) }) }; }),
       qAddFilter: () => { const f = D.fields.find(x => x.t === 'enum') || D.fields[0]; setQ({ filters:[...q.filters, { f:f.k, op:OPS[f.t][0], v:'' }] }); },
@@ -2318,6 +2406,7 @@ class Component extends DCLogic {
       qDirs:[['asc','Asc'],['desc','Desc']].map(([k, label]) => ({ label, state: q.dir === k ? 'active' : '', go: () => setQ({ dir:k }) })),
       qText, qHdr, qRows:qOut, qTotals:qTot || [], qHasTotals:!!qTot, qEmpty: nMatch === 0,
       qCount: grouped ? qOut.length + ' groups from ' + nMatch + ' of ' + D.rows.length + ' rows' : nMatch + ' of ' + D.rows.length + ' rows' + (nMatch > 50 ? ' · showing first 50' : ''),
+      qLive:false, sqlText:'', sqlHdr:[], sqlRows:[], sqlHasRows:false, sqlMsg:'', sqlMsgColor:'', ...live,
       qName:S.qName, qSetName: e => this.setState({ qName:e.target.value }),
       qSave: () => { const name = S.qName.trim() || D.label + ' query'; this.setState(st => ({ saved:[...st.saved.filter(x => x.name !== name), { name, user:true, q:{ ...st.q } }], qName:name })); this.toast('Report saved', name); },
       qCopy: () => { const tsv = [qRawHdr, ...qRaw].map(r => r.join('\t')).join('\n'); try { navigator.clipboard.writeText(tsv); } catch (e) {} this.toast('Copied to clipboard', qRaw.length + ' rows, tab-separated'); },
