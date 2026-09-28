@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
 <script src="./data/lima-db.js"></script>
+<script src="./data/lima-hydrate.js"></script>
 </head>
 <body>
 <x-dc>
@@ -56,11 +57,13 @@
     </div></sc-if>
     <div style="position:relative;width:220px;flex:0 1 220px;min-width:140px">
       <i class="ph ph-magnifying-glass" style="position:absolute;left:10px;top:10px;color:var(--muted);font-size:16px"></i>
-      <input class="sx-input" placeholder="Loan #, borrower, address" style="padding-left:32px">
+      <input class="sx-input" placeholder="Loan #, borrower, address" value="{{ search }}" onChange="{{ setSearch }}" style="padding-left:32px">
     </div>
   </header>
 
-  <div style="flex:1;overflow:auto;padding:24px;background:#fff">
+  <div style="flex:1;overflow:auto;padding:24px;background:#fff;position:relative">
+  <sc-if value="{{ dbLoading }}"><div style="position:absolute;inset:0;z-index:5;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted-dark)"><i class="ph ph-database" style="font-size:32px;color:var(--primary-dark)"></i><span style="font-size:15px;font-weight:600;color:var(--tertiary)">Loading servicing database…</span><span style="font-size:13px">Postgres is starting in your browser and restoring the lima-cap portfolio.</span></div></sc-if>
+  <sc-if value="{{ dbFailed }}"><div class="sx-alert" style="margin-bottom:16px;border-color:hsla(40,98%,43%,.5);background:var(--requirement-light)"><i class="ph ph-warning sx-alert-icon" style="color:var(--requirement)"></i><div><p class="sx-alert-title">Showing built-in sample data</p><p class="sx-alert-desc">{{ dbFailedText }}</p></div></div></sc-if>
 
   <!-- ================= PORTFOLIO A ================= -->
   <sc-if value="{{ is.dashA }}" hint-placeholder-val="{{ true }}">
@@ -110,7 +113,7 @@
         </div>
         <div style="flex:1"></div>
         <x-import component-from-global-scope="Button" variant="outline" size="sm" hint-size="90px,32px"><i class="ph ph-funnel"></i>Filters</x-import>
-        <x-import component-from-global-scope="Button" variant="outline" size="sm" hint-size="90px,32px"><i class="ph ph-download-simple"></i>Export</x-import>
+        <x-import component-from-global-scope="Button" variant="outline" size="sm" onClick="{{ exportLoans }}" hint-size="90px,32px"><i class="ph ph-download-simple"></i>Export</x-import>
       </div>
       <div style="overflow-x:auto">
       <table class="sx-table" style="min-width:980px">
@@ -132,7 +135,7 @@
         </tbody>
       </table>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--border);font-size:13px;color:var(--muted-dark)"><span>{{ loanCountLabel }}</span><span>Page 1 of 292</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--border);font-size:13px;color:var(--muted-dark)"><span>{{ loanCountLabel }}</span><span>{{ loanPageLabel }}</span></div>
     </div>
   </div>
   </sc-if>
@@ -141,7 +144,7 @@
   <sc-if value="{{ is.dashB }}">
   <div style="display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:20px;align-items:start">
     <div class="sx-card" style="overflow:hidden">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border)"><h3 class="sx-card-title">Today · Sep 25</h3><p class="sx-card-desc" style="margin-top:4px">{{ inboxSummary }}</p></div>
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border)"><h3 class="sx-card-title">Today · {{ asofS }}</h3><p class="sx-card-desc" style="margin-top:4px">{{ inboxSummary }}</p></div>
       <sc-for list="{{ taskGroups }}" as="g" hint-placeholder-count="6">
         <div onClick="{{ g.go }}" style="display:flex;align-items:center;gap:12px;padding:12px 20px 12px 17px;cursor:pointer;border-left:3px solid {{ g.bl }};background:{{ g.bg }};border-bottom:1px solid var(--border)" style-hover="background:var(--card-hover)">
           <i class="ph ph-{{ g.icon }}" style="font-size:20px;color:var(--muted-dark)"></i>
@@ -219,7 +222,7 @@
           </sc-for>
         </div>
         <div style="display:flex;gap:20px;margin-top:16px;font-size:12px;color:var(--muted-dark);flex-wrap:wrap">
-          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary)"></span>Payoff / refi confirmed</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary)"></span>{{ wallLegend }}</span>
           <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:var(--secondary)"></span>Extension in process</span>
           <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:var(--muted-light)"></span>No resolution</span>
         </div>
@@ -470,7 +473,7 @@
             <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:24px;font-weight:600">{{ loan.dueF }}</span><span style="color:var(--muted-dark)">{{ loan.next }}</span></div>
             <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted-dark)">Interest</span><span>{{ loan.intF }}</span></div>
             <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted-dark)">Escrow (tax + insurance)</span><span>{{ loan.escF }}</span></div>
-            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted-dark)">Method</span><span>ACH autopay ····4418</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted-dark)">Method</span><span>{{ loan.method }}</span></div>
           </div>
         </div>
         <sc-if value="{{ loan.hasLoss }}">
@@ -805,14 +808,14 @@
       <div class="sx-card-header"><h3 class="sx-card-title">Post Payment</h3><p class="sx-card-desc">Applied per note waterfall: fees, interest, escrow, principal</p></div>
       <div class="sx-card-content" style="display:flex;flex-direction:column;gap:14px">
         <div style="display:flex;flex-direction:column;gap:6px"><label class="sx-label">Loan</label>
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px"><i class="ph ph-buildings" style="font-size:18px;color:var(--muted-dark)"></i><div style="display:flex;flex-direction:column"><span style="font-weight:500">BPL-104827</span><span style="font-size:12px;color:var(--muted-dark)"><span onClick="{{ openCrestline }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">Crestline Holdings LLC</span> · due {{ post.dueF }}</span></div></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px"><i class="ph ph-buildings" style="font-size:18px;color:var(--muted-dark)"></i><div style="display:flex;flex-direction:column"><span style="font-weight:500">{{ post.id }}</span><span style="font-size:12px;color:var(--muted-dark)"><span onClick="{{ post.openB }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">{{ post.borrower }}</span> · due {{ post.dueF }} · {{ post.nextF }}</span></div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div style="display:flex;flex-direction:column;gap:6px"><label class="sx-label">Amount</label><input class="sx-input" value="{{ amt }}" onChange="{{ setAmt }}"></div>
-          <div style="display:flex;flex-direction:column;gap:6px"><label class="sx-label">Effective Date</label><input class="sx-input" value="09/25/2026" readOnly></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><label class="sx-label">Effective Date</label><input class="sx-input" value="{{ post.effF }}" readOnly></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px"><label class="sx-label">Method</label>
-          <div class="sx-tabs-list" style="align-self:flex-start"><button class="sx-tabs-trigger" data-state="active">Wire</button><button class="sx-tabs-trigger">ACH</button><button class="sx-tabs-trigger">Check</button><button class="sx-tabs-trigger">Lockbox</button></div>
+          <div class="sx-tabs-list" style="align-self:flex-start"><sc-for list="{{ payMethods }}" as="t"><button class="sx-tabs-trigger" data-state="{{ t.state }}" onClick="{{ t.go }}">{{ t.label }}</button></sc-for></div>
         </div>
         <div style="background:var(--muted-lightest);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
           <span style="font-size:12px;color:var(--muted-dark);text-transform:uppercase;letter-spacing:.06em">Allocation Preview</span>
@@ -833,8 +836,8 @@
   <sc-if value="{{ is.payB }}">
   <div style="display:flex;flex-direction:column;gap:20px">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <x-import component-from-global-scope="Badge" variant="navy" hint-size="120px,22px">Lockbox + ACH · Batch 0925-A</x-import>
-      <span style="color:var(--muted-dark);font-size:13px">Received 6:02 AM · Cutoff 4:00 PM ET</span>
+      <x-import component-from-global-scope="Badge" variant="navy" hint-size="120px,22px">{{ batchLabel }}</x-import>
+      <span style="color:var(--muted-dark);font-size:13px">{{ batchSub }}</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden">
       <sc-for list="{{ batch }}" as="b" hint-placeholder-count="4">
@@ -871,10 +874,10 @@
       <div style="padding:16px 20px;display:flex;align-items:center;gap:12px"><h3 class="sx-card-title" style="flex:1">Escrow &amp; Reserve Accounts</h3><x-import component-from-global-scope="Button" variant="outline" size="sm" hint-size="140px,32px"><i class="ph ph-arrows-clockwise"></i>Run Annual Analysis</x-import></div>
       <div style="overflow-x:auto">
       <table class="sx-table" style="min-width:900px">
-        <thead><tr><th>Loan</th><th style="text-align:right">Tax</th><th style="text-align:right">Insurance</th><th style="text-align:right">Interest Reserve</th><th style="text-align:right">Replacement / TI-LC</th><th>Next Disbursement</th><th>Status</th></tr></thead>
+        <thead><tr><th>Loan</th><sc-for list="{{ escHdr }}" as="h"><th style="text-align:right">{{ h }}</th></sc-for><th>Next Disbursement</th><th>Status</th></tr></thead>
         <tbody>
           <sc-for list="{{ escRows }}" as="r" hint-placeholder-count="6">
-            <tr><td><div style="font-weight:500;color:var(--primary-dark)">{{ r.id }}</div><div><span onClick="{{ r.openB }}" style="font-size:12px;color:var(--muted-dark);cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">{{ r.borrower }}</span></div></td><td style="text-align:right">{{ r.tax }}</td><td style="text-align:right">{{ r.ins }}</td><td style="text-align:right">{{ r.ir }}<div style="font-size:11px;color:var(--muted-dark)">{{ r.irSub }}</div></td><td style="text-align:right">{{ r.rr }}</td><td><div>{{ r.next }}</div><div style="font-size:12px;color:var(--muted-dark)">{{ r.nextAmt }}</div></td><td><x-import component-from-global-scope="Badge" variant="{{ r.bv }}" hint-size="80px,22px">{{ r.status }}</x-import></td></tr>
+            <tr><td><div style="font-weight:500;color:var(--primary-dark)">{{ r.id }}</div><div><span onClick="{{ r.openB }}" style="font-size:12px;color:var(--muted-dark);cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">{{ r.borrower }}</span></div></td><td style="text-align:right">{{ r.tax }}</td><td style="text-align:right">{{ r.ins }}</td><td style="text-align:right">{{ r.ir }}<div style="font-size:11px;color:var(--muted-dark)">{{ r.irSub }}</div></td><td style="text-align:right;font-size:13px;max-width:260px;white-space:normal">{{ r.rr }}</td><td><div>{{ r.next }}</div><div style="font-size:12px;color:var(--muted-dark)">{{ r.nextAmt }}</div></td><td><x-import component-from-global-scope="Badge" variant="{{ r.bv }}" hint-size="80px,22px">{{ r.status }}</x-import></td></tr>
           </sc-for>
         </tbody>
       </table>
@@ -887,7 +890,7 @@
   <sc-if value="{{ is.escB }}">
   <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,320px);gap:20px;align-items:start">
     <div class="sx-card" style="min-width:0">
-      <div class="sx-card-header"><h3 class="sx-card-title">Projected Escrow Balance · BPL-103552</h3><p class="sx-card-desc"><span onClick="{{ openSandoval }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">Sandoval Rentals LLC</span> · Oct 2026 – Sep 2027 · 2-month cushion {{ esc.cushionF }}</p></div>
+      <div class="sx-card-header"><h3 class="sx-card-title">Projected Escrow Balance · {{ esc.id }}</h3><p class="sx-card-desc"><span onClick="{{ esc.openB }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">{{ esc.borrower }}</span> · Oct 2026 – Sep 2027 · {{ esc.cushionMo }}-month cushion {{ esc.cushionF }}</p></div>
       <div class="sx-card-content" style="overflow-x:auto">
         <div style="display:flex;gap:8px;min-width:600px">
           <sc-for list="{{ esc.months }}" as="m" hint-placeholder-count="12">
@@ -911,7 +914,7 @@
       <div class="sx-card">
         <div class="sx-card-header"><h3 class="sx-card-title">Analysis Result</h3></div>
         <div class="sx-card-content" style="display:flex;flex-direction:column;gap:10px">
-          <x-import component-from-global-scope="Badge" variant="destructive" hint-size="80px,22px">Shortage {{ esc.shortF }}</x-import>
+          <x-import component-from-global-scope="Badge" variant="{{ esc.badgeBv }}" hint-size="80px,22px">{{ esc.badge }}</x-import>
           <sc-for list="{{ esc.lines }}" as="l" hint-placeholder-count="5"><div style="display:flex;justify-content:space-between;font-size:13px;gap:12px"><span style="color:var(--muted-dark)">{{ l.k }}</span><span style="font-weight:500">{{ l.v }}</span></div></sc-for>
           <div class="sx-sep sx-sep-h"></div>
           <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-weight:600">New Monthly Escrow</span><span style="font-size:20px;font-weight:600">{{ esc.newF }}</span></div>
@@ -1218,10 +1221,12 @@
   <!-- ================= MATURITY B: extension workflow ================= -->
   <sc-if value="{{ is.matB }}">
   <div style="display:flex;flex-direction:column;gap:20px;max-width:980px">
+    <sc-if value="{{ extHasPick }}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:12px;color:var(--muted-dark)">Open requests</span><div class="sx-tabs-list" style="flex-wrap:wrap;height:auto"><sc-for list="{{ extPick }}" as="p"><button class="sx-tabs-trigger" data-state="{{ p.state }}" onClick="{{ p.go }}">{{ p.label }}</button></sc-for></div></div></sc-if>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <h2 style="font-size:22px;font-weight:600">Extension Request · BPL-104827</h2>
-      <x-import component-from-global-scope="Badge" variant="outline" hint-size="80px,22px">Matures Nov 30, 2026</x-import>
-      <span style="font-size:13px;color:var(--muted-dark)"><span onClick="{{ openCrestline }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">Crestline Holdings LLC</span> · Guarantor <span onClick="{{ openReyes }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">Daniel Reyes</span> · Harbor Point Capital</span>
+      <h2 style="font-size:22px;font-weight:600">Extension Request · {{ ext.id }}</h2>
+      <x-import component-from-global-scope="Badge" variant="outline" hint-size="80px,22px">Matures {{ ext.maturity }}</x-import>
+      <x-import component-from-global-scope="Badge" variant="{{ ext.statusBv }}" hint-size="80px,22px">{{ ext.status }}</x-import>
+      <span style="font-size:13px;color:var(--muted-dark)"><span onClick="{{ ext.openB }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">{{ ext.borrower }}</span> · Guarantor <span onClick="{{ ext.openG }}" style="cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);text-underline-offset:3px" style-hover="color:var(--primary-dark);text-decoration-color:var(--primary-dark)">{{ ext.guarantor }}</span> · {{ ext.investor }}</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">
       <sc-for list="{{ steps }}" as="s" hint-placeholder-count="5">
@@ -1236,11 +1241,11 @@
         <div class="sx-card-content" style="display:flex;flex-direction:column;gap:16px">
           <h3 class="sx-card-title">Borrower Request</h3>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
-            <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:var(--muted-dark)">Received</span><span style="font-weight:500">Sep 18, 2026 · borrower portal</span></div>
-            <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:var(--muted-dark)">Requested Term</span><span style="font-weight:500">6 months (option 1 of 2)</span></div>
-            <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:var(--muted-dark)">Exit Strategy</span><span style="font-weight:500">Sale · listed Sep 10</span></div>
+            <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:var(--muted-dark)">Received</span><span style="font-weight:500">{{ ext.received }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:var(--muted-dark)">Requested Term</span><span style="font-weight:500">{{ ext.term }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12px;color:var(--muted-dark)">Conditions</span><span style="font-weight:500">{{ ext.conditions }}</span></div>
           </div>
-          <div style="background:var(--muted-lightest);border-radius:8px;padding:14px 16px;line-height:1.55">Rehab completed Aug 28. Units 1–3 listed for sale; two offers under review. Requesting first extension to close the sale.</div>
+          <div style="background:var(--muted-lightest);border-radius:8px;padding:14px 16px;line-height:1.55">{{ ext.narrative }}</div>
         </div>
       </sc-if>
       <sc-if value="{{ st.s2 }}">
@@ -1276,7 +1281,7 @@
               <x-import component-from-global-scope="Badge" variant="{{ a.bv }}" hint-size="80px,22px">{{ a.status }}</x-import>
             </div>
           </sc-for>
-          <span style="font-size:13px;color:var(--muted-dark);padding-top:10px">Whole-loan investor consent required per servicing agreement §4.2.</span>
+          <span style="font-size:13px;color:var(--muted-dark);padding-top:10px">{{ ext.consentNote }}</span>
         </div>
       </sc-if>
       <sc-if value="{{ st.s5 }}">
@@ -1383,7 +1388,7 @@
   <div style="display:flex;flex-direction:column;gap:20px">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <div class="sx-tabs-list"><button class="sx-tabs-trigger">Jul 2026</button><button class="sx-tabs-trigger">Aug 2026</button><button class="sx-tabs-trigger" data-state="active">Sep 2026</button></div>
-      <span style="font-size:13px;color:var(--muted-dark)">Collection period Sep 1 – Sep 30 · Remit date Oct 15</span>
+      <span style="font-size:13px;color:var(--muted-dark)">Collection period Sep 1 – Sep 30 · principal and interest applied from posted payments</span>
       <div style="flex:1"></div>
       <x-import component-from-global-scope="Button" variant="outline" size="sm" hint-size="110px,32px"><i class="ph ph-file-xls"></i>Export Tape</x-import>
       <x-import component-from-global-scope="Button" variant="default" size="sm" onClick="{{ lockRemit }}" hint-size="120px,32px"><i class="ph ph-lock-simple"></i>Lock Period</x-import>
@@ -1396,16 +1401,16 @@
           <sc-for list="{{ remit }}" as="r" hint-placeholder-count="4">
             <tr><td style="font-weight:500">{{ r.name }}<div style="font-size:12px;font-weight:400;color:var(--muted-dark)">{{ r.sub }}</div></td><td style="text-align:right">{{ r.loans }}</td><td style="text-align:right">{{ r.upb }}</td><td style="text-align:right">{{ r.p }}</td><td style="text-align:right">{{ r.i }}</td><td style="text-align:right">{{ r.fee }}</td><td style="text-align:right;font-weight:600">{{ r.net }}</td><td><x-import component-from-global-scope="Badge" variant="{{ r.bv }}" hint-size="90px,22px">{{ r.rec }}</x-import></td></tr>
           </sc-for>
-          <tr style="background:var(--muted-lightest)"><td style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">2,334</td><td style="text-align:right;font-weight:600">$1,180.2M</td><td style="text-align:right;font-weight:600">$13,936,358</td><td style="text-align:right;font-weight:600">$9,716,907</td><td style="text-align:right;font-weight:600">$234,126</td><td style="text-align:right;font-weight:600">$23,419,139</td><td></td></tr>
+          <tr style="background:var(--muted-lightest)"><td style="font-weight:600">Total</td><td style="text-align:right;font-weight:600">{{ remitTot.loans }}</td><td style="text-align:right;font-weight:600">{{ remitTot.upb }}</td><td style="text-align:right;font-weight:600">{{ remitTot.p }}</td><td style="text-align:right;font-weight:600">{{ remitTot.i }}</td><td style="text-align:right;font-weight:600">{{ remitTot.fee }}</td><td style="text-align:right;font-weight:600">{{ remitTot.net }}</td><td></td></tr>
         </tbody>
       </table>
       </div>
     </div>
     <div class="sx-card">
-      <div class="sx-card-header"><h3 class="sx-card-title">Open Variance · Meridian Life</h3><p class="sx-card-desc">Custodial account vs. servicing system</p></div>
+      <div class="sx-card-header"><h3 class="sx-card-title">{{ remitVarTitle }}</h3><p class="sx-card-desc">{{ remitVarDesc }}</p></div>
       <div class="sx-card-content" style="overflow-x:auto">
-        <table class="sx-table"><thead><tr><th>Loan</th><th>Item</th><th style="text-align:right">Variance</th><th>Owner</th></tr></thead>
-          <tbody><tr><td style="color:var(--primary-dark);font-weight:500">BPL-101876</td><td>Late fee collected Sep 29, posted Oct 1</td><td style="text-align:right;font-weight:500">$1,204.00</td><td>J. Park</td></tr></tbody>
+        <table class="sx-table"><thead><tr><th>Loan</th><th>Item</th><th style="text-align:right">Amount</th><th>Investor</th><th>Status</th></tr></thead>
+          <tbody><sc-for list="{{ remitVar }}" as="v"><tr><td style="color:var(--primary-dark);font-weight:500">{{ v.id }}</td><td>{{ v.item }}</td><td style="text-align:right;font-weight:500">{{ v.amt }}</td><td>{{ v.inv }}</td><td>{{ v.st }}</td></tr></sc-for></tbody>
         </table>
       </div>
     </div>
@@ -1459,12 +1464,306 @@ class Component extends DCLogic {
     approvals: { 'BPL-100902':{ strategy:'Forbearance', date:'Jul 20, 2026', by:'R. Chen', baseline:1048000, projected:293440 }, 'BPL-101455':{ strategy:'Deed-in-Lieu', date:'Sep 18, 2026', by:'R. Chen', baseline:1188000, projected:807840 } },
     q: { ds:'loans', cols:null, filters:[], group:'', agg:'sum', sort:'upb', dir:'desc' }, saved: [], qName: '', hcfg: { thr:'1.20', buf:'0.10', occ:'10', exp:'15' }, scen: 'Modification', stratIn: {}, libSel: null, lossDim: 'month', lossFilter: null, relName: 'Aaron Wexler', relEntity: null, navCollapsed: false, loanId: 'BPL-104827', loanTab: 'overview', task: 'exceptions', typeFilter: 'All',
     amt: '13485.00', extraPosted: [], resolved: {}, coll: 0, step: 1, pod: 20, toast: null,
-    dbStatus: (window.LimaDB && window.LimaDB.status) || 'missing', sqlText: null, sqlRun: null, sqlN: 0
+    dbStatus: (window.LimaDB && window.LimaDB.status) || 'missing', sqlText: null, sqlRun: null, sqlN: 0,
+    hydrated: false, hydrateError: null, dataV: 0, search: '', extId: null, payMethod: 'Wire'
   };
 
   // ---- Live servicing database (PGlite in the browser, see data/lima-db.js) ----
   _qc = {};
-  componentDidMount() { if (window.LimaDB) window.LimaDB.onChange(st => { if (st !== this.state.dbStatus) this.setState({ dbStatus:st }); }); }
+  componentDidMount() {
+    if (window.LimaDB) window.LimaDB.onChange(st => { if (st !== this.state.dbStatus) this.setState({ dbStatus:st }); if (st === 'ready' && !this._hyd) this.hydrate(); });
+  }
+
+  // ---- Live screen data (data/lima-hydrate.js). Before it loads, or if it fails, the built-in sample data renders. ----
+  D = null;
+  hydrate() {
+    if (!window.LimaHydrate || !window.LimaDB) { this.setState({ hydrateError:'data/lima-hydrate.js not loaded' }); return Promise.resolve(); }
+    this._hyd = true;
+    return window.LimaHydrate.load(window.LimaDB).then(D => {
+      const first = !this.D; this.applyData(D);
+      if (!first) return this.setState(s => ({ dataV: s.dataV + 1 }));
+      const c0 = D.COL.findIndex(c => D.ANALYSIS[c[0]]), L0 = D.COL[0] ? D.byId[D.COL[0][0]] : D.LOANS[0];
+      this.setState(s => ({ hydrated:true, dataV: s.dataV + 1, approvals:{ ...D.APPROVALS }, loanId:L0.id, amt:null, relName: D.REL_PICK[0] ? D.REL_PICK[0].name : L0.guarantor,
+        relEntity:null, coll: Math.max(0, c0), scen:'Modification', stratIn:{}, libSel:null, extraPosted:[], resolved:{}, extId: D.EXT[0] ? D.EXT[0].request_id : null, lossFilter:null }));
+    }, e => { console.error('[LimaHydrate]', e); this.setState({ hydrateError: e.message || String(e) }); });
+  }
+  applyData(D) {
+    this.D = D; this.LOANS = D.LOANS; this.FACTS = D.FACTS; this.LOSS_IN = D.LOSS_IN; this.PROJ = D.PROJ; this.RESOLVED = D.RESOLVED;
+    this.COL_IDS = D.COL.map(c => c[0]); this.HP = {}; this._syn = {}; this._extra = {}; this._hc = {}; this._qc = {};
+    this.RELS = D.REL_PICK.map(p => this.relDb(p.name));
+  }
+  cap(s) { return s ? String(s).charAt(0).toUpperCase() + String(s).slice(1).replace(/_/g, ' ') : ''; }
+  big(u) { return u >= 1e9 ? '$' + (u / 1e9).toFixed(2) + 'B' : this.short(u); }
+  // Runs writes against the in-browser database, then reloads every screen from it.
+  dbWrite(fn, title, desc) {
+    if (!window.LimaDB || !this.D) return;
+    const q = (sql, params) => window.LimaDB.query(sql, params || []);
+    Promise.resolve().then(() => fn(q)).then(() => this.hydrate()).then(() => this.toast(title, desc), e => { console.error('[LimaDB write]', e); this.toast('Could not save', e.message || String(e)); });
+  }
+
+  relDb(name) {
+    if (this._syn[name]) return this._syn[name];
+    const D = this.D, GT = { full_recourse:'Full recourse guaranty', limited:'Limited guaranty', completion:'Completion guaranty', guarantor:'Guarantor', principal:'Entity principal', borrower:'Individual borrower' };
+    let P = D.PEOPLE[name];
+    if (!P) P = [...new Set(D.LOANS.filter(l => l.borrower === name).flatMap(l => D.LOAN_PEOPLE[l.id] || []))].map(n => D.PEOPLE[n]).filter(Boolean).sort((a, b) => b.loans.length - a.loans.length)[0];
+    const ids = P ? P.loans : D.LOANS.filter(l => l.borrower === name).map(l => l.id), Ls = ids.map(id => D.byId[id]).filter(Boolean);
+    if (!Ls.length) return D.REL_PICK[0] && D.REL_PICK[0].name !== name ? this.relDb(D.REL_PICK[0].name) : this.relDb(D.LOANS[0].borrower);
+    const onRel = n => ids.filter(id => (D.LOAN_PEOPLE[id] || []).includes(n));
+    const co = P ? [...new Set(ids.flatMap(id => D.LOAN_PEOPLE[id] || []))].filter(n => n !== P.name).slice(0, 3) : [];
+    const guarantors = (P ? [P.name, ...co] : []).map((n, i) => { const mine = onRel(n), roles = [...new Set(mine.map(id => D.PEOPLE[n].roles[id]))];
+      return { name:n, role: i === 0 ? 'Primary guarantor' : 'Co-guarantor', detail: roles.map(r => GT[r] || this.cap(r)).join(' · ') + ' · ' + mine.length + (mine.length === 1 ? ' loan' : ' loans'),
+        entities: [...new Set(mine.map(id => D.byId[id].borrower))] }; });
+    const loans = Ls.map(L => { const t = D.TIER[L.id] || { tier0:'Pass', changes:[] }, pj = D.PROJ[L.id];
+      return { id:L.id, entity:L.borrower, type:L.type, prog: L.prog === 'MF' ? 'CRE' : L.prog, upb:L.upb, pmt: (L.sched.p + L.sched.i) || L.upb * L.rate / 1200, maturity:L.maturity, status:L.status,
+        city:L.city, state:L.state, msa:L.msa, tier0:t.tier0, changes:t.changes, unfunded: pj ? Math.max(0, pj.budget - pj.funded) : 0, dscr:L.dscr, next:L.next }; });
+    let last = 0; const trend = ((P && D.TREND[P.borrowerId]) || Array(12).fill(0)).map(v => (v == null ? last : (last = v)));
+    const signals = Ls.flatMap(L => D.SIGNALS[L.id] || []).sort((a, b) => (a.dateD < b.dateD ? 1 : -1)).slice(0, 6).map(s => [s.date, s.type, s.sev, s.text, s.source, s.icon]);
+    const rel = { key:'db:' + (P ? P.name : name), guarantors, loans, trend, signals };
+    this._syn[name] = rel; if (P) this._syn[P.name] = rel;
+    return rel;
+  }
+
+  healthDb(L) {
+    const src = this.D.HEALTH[L.id]; if (!src || !src.length) return null;
+    const c = this.state.hcfg, key = L.id + '|' + c.thr + '|' + c.buf + '|' + c.occ + '|' + c.exp; if (this._hc[key]) return this._hc[key];
+    const num = x => parseFloat(String(x).replace(/[^0-9.\-]/g, '')) || 0, thr = num(c.thr), buf = num(c.buf), occT = num(c.occ), expT = num(c.exp);
+    const u = L.units || 1, n = src.length, l = n - 1, P = src.map(r => r.period.slice(5) + ' ' + r.period.slice(0, 4));
+    const rows = src.map((r, i) => { const egi = r.rent, gpr = egi / Math.max(r.occ / 100, 0.01), noi = egi - r.opex;
+      return { p:P[i], occ:Math.round(u * r.occ / 100), occPct:Math.round(r.occ), rent:gpr / u / 3, gpr, vac:gpr - egi, bd:0, egi, opex:r.opex, noi, dscr:r.dscr }; });
+    const d = rows.map(x => x.dscr), occP = rows.map(x => x.occPct), X = v => v.toFixed(2) + 'x', flags = [];
+    const falling2 = n >= 3 && d[l] < d[l - 1] && d[l - 1] < d[l - 2], proj = n >= 3 ? d[l] + (d[l] - d[l - 2]) / 2 : d[l], breached = d[l] < thr;
+    if (breached) flags.push({ sev:'high', title:'DSCR covenant breached', text:'DSCR is ' + X(d[l]) + ' for ' + P[l] + ', below the ' + X(thr) + ' covenant.' });
+    else if (falling2 && proj < thr + buf) flags.push({ sev:'med', title:'DSCR trending toward covenant', text:'Down two periods in a row, from ' + X(d[l - 2]) + ' to ' + X(d[l]) + '. At this pace next period is ' + X(proj) + ', within ' + X(buf) + ' of the ' + X(thr) + ' threshold.' });
+    const od = n >= 3 ? occP[l - 2] - occP[l] : 0;
+    if (od > occT) flags.push({ sev:'med', title:'Occupancy down ' + od + ' pts', text:'From ' + occP[l - 2] + '% in ' + P[l - 2] + ' to ' + occP[l] + '% in ' + P[l] + '. Trigger is more than ' + occT + ' pts over two periods.' });
+    const exp = [['Collected rent','egi'],['Total operating expenses','opex']].map(([label, f]) => ({ label, f, prior:rows[0][f], cur:rows[l][f], chg:(rows[l][f] / (rows[0][f] || 1) - 1) * 100 }));
+    if (exp[1].chg > expT) flags.push({ sev:'med', title:'Operating expenses +' + Math.round(exp[1].chg) + '% year over year', text:'Above the ' + expT + '% trigger (' + P[l] + ' vs ' + P[0] + ').' });
+    const sig = this.D.SIGNALS[L.id] || [], tx = sig.find(s => /Tax/.test(s.type)), ins = sig.find(s => /Insurance/.test(s.type));
+    const ti = [['Property tax', tx ? 'Delinquent' : 'No delinquency on file', tx ? (tx.text || 'Flagged ' + tx.date) : 'Tax monitor · no open signal', tx ? 'warn' : 'ok'],
+      ['Hazard insurance', ins ? 'Lapsed' : 'Active', ins ? (ins.text || 'Flagged ' + ins.date) : 'Insurance monitor · no open signal', ins ? 'warn' : 'ok']];
+    if (tx || ins) flags.push({ sev:'med', title:'Tax or insurance needs attention', text:ti.filter(t => t[3] !== 'ok').map(t => t[0] + ': ' + t[1]).join('; ') + '.' });
+    return this._hc[key] = { P, rows, d, occP, falling2, proj, breached, flags, exp, pr:{ ti, leases:null, units:u }, thr, buf, expT, DSq: rows[l].noi / Math.max(d[l], 0.01), u };
+  }
+
+  // Payments and activity for one loan, fetched when the loan is opened.
+  loanDetail(L) {
+    return this.dbq(`SELECT p.payment_id, p.payment_received_date AS d, p.payment_method_type AS m, p.status, p.payment_amount::float8 AS amt,
+      COALESCE(sum(pa.applied_amount) FILTER (WHERE pa.bucket IN ('principal','payoff_principal')), 0)::float8 AS pr,
+      COALESCE(sum(pa.applied_amount) FILTER (WHERE pa.bucket = 'interest'), 0)::float8 AS it,
+      COALESCE(sum(pa.applied_amount) FILTER (WHERE pa.bucket = 'escrow'), 0)::float8 AS es,
+      COALESCE(sum(pa.applied_amount) FILTER (WHERE pa.bucket IN ('late_charge','fee','extension_fee','prepay_penalty')), 0)::float8 AS fe,
+      COALESCE(sum(pa.applied_amount) FILTER (WHERE pa.bucket = 'suspense'), 0)::float8 AS su
+      FROM payment p LEFT JOIN payment_application pa USING (payment_id) WHERE p.loan_id = $1
+      GROUP BY p.payment_id ORDER BY p.payment_received_date DESC, p.payment_id DESC LIMIT 12`, [L.loanId], this.state.dataV);
+  }
+  loanViewDb(L) {
+    const D = this.D, m = this.m.bind(this), F = D.fmt, cap = this.cap, lk = { cursor:'pointer', deco:'underline dotted' }, nl = { cursor:'default', deco:'none' };
+    const int = L.sched.i || L.upb * L.rate / 1200, prin = L.sched.p || 0, esc = L.sched.e || 0, due = L.sched.total || int + prin + esc;
+    const ltv = Math.round(L.upb / L.value * 100), perDiem = L.upb * L.rate / 100 / 360, rate3 = L.rate.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+    const strip = [{ k:'Unpaid Principal', v:m(L.upb, 0) }, { k:'Note Rate', v:rate3 + '%' }, { k:'Next Due', v:L.next }, { k:'Maturity', v:L.maturity }, { k:'LTV', v:ltv + '%' },
+      { k:L.dscr ? 'DSCR' : 'LTARV', v:L.dscr || (L.arv ? Math.round(L.upb / L.arv * 100) + '%' : '—') }];
+    const terms = [{ k:'Original Balance', v:m(L.noteAmt, 0) }, { k:'Product', v:L.product }, { k:'Rate Type', v:'Fixed' }, { k:'Default Rate', v: L.defaultRate != null ? L.defaultRate.toFixed(2) + '%' : '—' },
+      { k:'Payment Type', v:L.io ? 'Interest-only' : 'P&I, ' + Math.round((L.amort || 360) / 12) + '-yr amortization' }, { k:'Monthly P&I / Interest', v:m(int + prin) },
+      { k:'Escrow', v: esc ? m(esc) + ' / mo' : 'Not escrowed' }, { k:'Note Date', v:L.noteDate }, { k:'Funded', v:L.orig }, { k:'Maturity', v:L.maturity },
+      { k:'Term', v:(L.term || '—') + ' months' }, { k:'Late Charge', v: L.lateRate != null ? L.lateRate.toFixed(0) + '% after ' + (L.grace || 10) + '-day grace' : '—' },
+      { k:'Recourse', v:cap(L.recourse) || '—' }, { k:'Loan Purpose', v:(L.purpose ? cap(L.purpose) + ' · ' : '') + 'business purpose' },
+      ...(L.holdback ? [{ k:'Rehab Holdback', v:m(L.holdback, 0) }] : []), ...(L.ir ? [{ k:'Interest Reserve', v:m(L.ir, 0) }] : [])];
+    const sig = D.SIGNALS[L.id] || [], insSig = sig.find(s => /Insurance/.test(s.type));
+    const collateral = [{ k:'Address', v:L.property }, { k:'Property Type', v:L.ptype }, { k:'Metro', v:L.msa || '—' },
+      { k:'As-Is Value', v:m(L.value, 0) + (L.valueSrc === 'appraisal' ? '' : ' (' + L.valueSrc + ')') },
+      { k:L.arv ? 'After-Repair Value' : 'DSCR', v:L.arv ? m(L.arv, 0) : (L.dscr || '—') }, { k:'Insurance', v: insSig ? 'Lapse flagged ' + insSig.date : 'No lapse on file' }];
+    const rl = this.relFor(L.guarantor !== '—' ? L.guarantor : L.borrower), rd = this.relDowns(rl), tasks = D.TASKS[L.id] || [], am = tasks.find(t => t.assigned_to);
+    const parties = [
+      { k:'Borrower', v:L.borrower, click:this.relClick(L.borrower), ...lk }, { k:'Guarantor', v:L.guarantor, click:this.relClick(L.guarantor), ...(L.guarantor === '—' ? nl : lk) },
+      { k:'Relationship', v:rl.loans.length + ' loans · ' + this.short(rl.loans.reduce((s, x) => s + x.upb, 0)), click:this.relClick(L.guarantor !== '—' ? L.guarantor : L.borrower), ...lk },
+      { k:'Investor', v:L.investor + (L.feeBps ? ' · ' + L.feeBps + ' bps' : ''), ...nl }, { k:'Asset Manager', v: am ? am.assigned_to : 'Unassigned', ...nl }];
+    const q = this.loanDetail(L), rows = q.rows, ML = { ach:'ACH', wire:'Wire', check:'Check', online:'Online', payoff_wire:'Payoff wire' };
+    let bal = L.upb;
+    const ledger = rows.map(r => { const o = { date:F(r.d), type:'Payment · ' + (ML[r.m] || r.m) + (r.status !== 'posted' ? ' · ' + r.status : '') + (r.su ? ' · suspense' : ''), total:m(r.amt), p:m(r.pr), i:m(r.it), e:m(r.es), f:m(r.fe), bal:m(bal, 0) }; bal += r.pr; return o; });
+    if (!rows.length) ledger.push({ date: q.pending ? 'Loading…' : '—', type: q.pending ? '' : 'No payments on file', total:'', p:'', i:'', e:'', f:'', bal:m(L.upb, 0) });
+    const acts = D.ACTIVITY[L.id] || [];
+    const notes = [...tasks.map(t => ({ initials:(t.assigned_to || t.owner_role || 'SV').split(/[\s._]+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(), who:t.assigned_to || cap(t.owner_role || 'Servicing'),
+        when:'Due ' + F(t.due_date), text:t.name + ' · ' + cap(t.status) + (t.notes ? '. ' + t.notes : '') })),
+      ...acts.filter(a => ['promise','decision','freeze','extension','resolved'].includes(a.kind)).map(a => ({ initials:'SV', who:cap(a.kind), when:F(a.event_date), text:a.label + (a.detail ? ' · ' + a.detail : '') + (a.amount ? ' · ' + m(a.amount) : '') }))].slice(0, 10);
+    if (!notes.length) notes.push({ initials:'SV', who:'Servicing', when:D.asofF, text:'No open tasks or servicing notes on this loan.' });
+    const IC = { tier:['arrow-fat-lines-down','hsla(3,74%,35%,.12)','var(--destructive)'], breach:['warning','hsla(3,74%,35%,.12)','var(--destructive)'], notice:['envelope-simple','hsla(282,49%,39%,.12)','var(--secondary)'],
+      task:['check-square','var(--muted-lightest)','var(--tertiary)'], promise:['handshake','var(--primary-light)','var(--primary-dark)'], extension:['calendar-plus','var(--primary-light)','var(--primary-dark)'],
+      decision:['gavel','var(--muted-lightest)','var(--tertiary)'], freeze:['snowflake','var(--muted-lightest)','var(--tertiary)'], resolved:['flag-checkered','hsla(149,56%,30%,.12)','var(--success)'],
+      funded:['flag','var(--tertiary)','#fff'], payment:['check','hsla(149,56%,30%,.12)','var(--success)'] };
+    const ev = [...acts.map(a => ({ d:D.iso(a.event_date), kind:a.kind, title:a.label + (a.amount ? ' · ' + m(a.amount) : ''), desc:a.detail || '' })),
+      ...rows.slice(0, 6).map(r => ({ d:D.iso(r.d), kind:'payment', title:'Payment received · ' + m(r.amt), desc:(ML[r.m] || r.m) + '. Interest ' + m(r.it) + (r.pr ? ', principal ' + m(r.pr) : '') + (r.es ? ', escrow ' + m(r.es) : '') + '.' }))]
+      .sort((a, b) => (a.d < b.d ? 1 : -1)).slice(0, 16);
+    if (!ev.some(e => e.kind === 'funded')) ev.push({ d:null, kind:'funded', title:'Loan funded · ' + m(L.noteAmt, 0), desc:L.product + ' · business-purpose loan boarded.' });
+    const timeline = ev.map(e => { const ic = IC[e.kind] || ['circle','var(--muted-lightest)','var(--tertiary)']; return { date: e.d ? F(e.d) : L.orig, icon:ic[0], title:e.title, desc:e.desc, bg:ic[1], fg:ic[2] }; });
+    const a = D.ANALYSIS[L.id], lb = a ? this.lossBase(L.id) : null, ap = this.state.approvals[L.id], res = D.RESOLVED.find(t => t[0] === L.id);
+    const lossRows = lb ? [
+      { k:'Loss Exposure', v:m(lb.total, 0), color:'var(--tertiary)', desc:'Foreclosure-to-REO baseline · analysis ' + F(a.analysis_date) + ' · ' + cap(a.status) + ' · ' + (a.severity || 0).toFixed(1) + '% severity.' },
+      { k:'Frozen Baseline', v: ap ? m(ap.baseline, 0) : res ? m(res[7], 0) : 'Not frozen', color: ap || res ? 'var(--tertiary)' : 'var(--muted-dark)', desc: ap ? 'Locked ' + ap.date + ' at ' + ap.strategy + ' approval.' : res ? 'Locked ' + res[6] + '.' : 'Freezes when a resolution scenario is approved.' },
+      { k:'Loss Severity', v: res ? m(res[11], 0) : 'Pending', color: res ? 'var(--tertiary)' : 'var(--muted-dark)', desc: res ? 'Realized ' + res[9] + ' via ' + res[3] + '.' : 'Actual realized loss, recorded when the loan resolves.' },
+      { k:'Loss Prevention', v: res ? m(res[7] - res[11], 0) : 'Pending', color: res ? 'var(--success)' : 'var(--muted-dark)', desc:'Frozen baseline minus realized loss, recorded at resolution.' } ] : [];
+    const PJ = D.PROJ[L.id], ci = this.COL_IDS.indexOf(L.id);
+    const rtl = PJ ? { canCalc: PJ.insp < 100 && ci >= 0 && !!D.FACTS[L.id], go: () => this.go('strategy', { coll:ci, libSel:'Project Completion' }),
+      rows: [
+        { k:'Budget', v:m(PJ.budget, 0), sub:'', subColor:'var(--muted-dark)' },
+        { k:'Draws funded', v:m(PJ.funded, 0), sub:Math.round(PJ.funded / Math.max(PJ.budget, 1) * 100) + '% of budget', subColor:'var(--muted-dark)' },
+        { k:'Remaining holdback', v:m(PJ.budget - PJ.funded, 0), sub:'', subColor:'var(--muted-dark)' },
+        { k:'Percent complete', v:PJ.insp + '%', sub:'Inspection ' + PJ.inspDate + ' · ' + PJ.inspector, subColor:'var(--muted-dark)' },
+        { k:'Cost to complete', v:m(PJ.ctc, 0), sub: PJ.ctc > PJ.budget - PJ.funded ? 'Shortfall ' + m(PJ.ctc - (PJ.budget - PJ.funded), 0) + ' vs holdback' : 'Within holdback', subColor: PJ.ctc > PJ.budget - PJ.funded ? 'var(--destructive)' : 'var(--muted-dark)' },
+        { k:'Original completion', v:PJ.orig, sub:'', subColor:'var(--muted-dark)' },
+        { k:'Current completion', v:PJ.cur, sub: PJ.insp >= 100 ? 'Completed' : PJ.slip ? '+' + PJ.slip + ' days' : 'On schedule', subColor: PJ.insp < 100 && PJ.slip > 30 ? 'var(--destructive)' : 'var(--muted-dark)' } ] } : { rows:[] };
+    const HV = this.healthView(L);
+    return { ...L, hasHealth: !!HV, health: HV || {}, hasHealthFlag: !!(HV && HV.flagCount), healthBv: HV && HV.breached ? 'destructive' : 'warning', healthBadge: HV && HV.breached ? 'DSCR covenant breached' : 'Property health warning',
+      goHealth: () => this.setState({ loanTab:'health' }), hasRtl: !!PJ, rtl, hasLoss: !!lb, lossRows, openB:this.relClick(L.borrower), openG:this.relClick(L.guarantor), relFlag:rd.flag,
+      bv:this.BV[L.status] || 'outline', strip, terms, collateral, parties, ledger, notes, timeline, int, prin, esc, due, perDiem,
+      dueF:m(due), intF:m(int + prin), escF:m(esc), method: rows[0] ? (ML[rows[0].m] || rows[0].m) + ' · last paid ' + F(rows[0].d) : q.pending ? 'Loading…' : 'No payments on file' };
+  }
+  checksDb(L) {
+    const D = this.D, ok = { icon:'check-circle', color:'var(--success)' }, wn = { icon:'warning-circle', color:'var(--requirement)' };
+    const dm = L.maturityD ? D.days(D.asof, L.maturityD) : 999, notices = (D.ACTIVITY[L.id] || []).filter(a => a.kind === 'notice'), matSig = (D.SIGNALS[L.id] || []).find(s => /Maturity/.test(s.type));
+    const sched = (L.noticeDays || '90 / 60 / 30') + ' days';
+    return [
+      { ...(L.lateRate != null ? ok : wn), title:'Late charge terms', desc: L.lateRate != null ? L.lateRate.toFixed(0) + '% charge after ' + (L.grace || 10) + '-day grace, per ' + L.product + ' servicing terms.' : 'No late charge terms on file for this product.' },
+      { ...(dm < 0 || (dm <= 90 && !matSig && !notices.length) ? wn : ok), title:'Maturity notice timing',
+        desc: dm < 0 ? 'Matured ' + (-dm) + ' days ago; maturity default notice required.' : dm <= 90 ? (matSig ? 'Maturity within 90 days flagged ' + matSig.date + '. Notice schedule ' + sched + '.' : notices.length ? 'Last notice sent ' + D.fmt(notices[0].event_date) + '.' : 'Matures in ' + dm + ' days; no maturity notice on file.') : dm > 365 ? 'Matures ' + L.maturity + '. Notices go out ' + sched + ' before maturity.' : 'Matures in ' + dm + ' days. Notices at ' + sched + '.' },
+      { ...(L.dpd >= 30 ? wn : ok), title:'Default interest', desc: L.dpd >= 30 ? 'Loan is ' + L.dpd + ' days past due. Confirm notice of default before applying the ' + (L.defaultRate || 0).toFixed(2) + '% default rate.' : 'No default interest applied. Default rate ' + (L.defaultRate != null ? L.defaultRate.toFixed(2) + '%' : 'per note') + '.' } ];
+  }
+
+  portfolioDb(m) {
+    const D = this.D, LS = this.LOANS, sum = (a, f) => a.reduce((t, x) => t + f(x), 0), up = sum(LS, l => l.upb), tr = D.DPD_TREND, n = tr.length;
+    const d30 = LS.filter(l => l.dpd >= 30), mat90 = LS.filter(l => l.maturityD && D.days(D.asof, l.maturityD) >= 0 && D.days(D.asof, l.maturityD) <= 90);
+    const newM = LS.filter(l => l.fundedD && l.fundedD.slice(0, 7) === D.asof.slice(0, 7)).length, dl = n >= 2 ? tr[n - 1][1] - tr[n - 2][1] : 0;
+    const kpis = [
+      { label:'Unpaid Principal', value:this.big(up), delta:new Set(LS.map(l => l.state)).size + ' states · ' + new Set(LS.map(l => l.msa)).size + ' metros', deltaColor:'var(--muted-dark)' },
+      { label:'Active Loans', value:LS.length.toLocaleString(), delta:newM + ' funded in ' + D.asofS.split(' ')[0], deltaColor:'var(--muted-dark)' },
+      { label:'WA Coupon', value:(sum(LS, l => l.upb * l.rate) / up).toFixed(2) + '%', delta:'UPB-weighted note rate', deltaColor:'var(--muted-dark)' },
+      { label:'30+ DPD (UPB)', value:(sum(d30, l => l.upb) / up * 100).toFixed(1) + '%', delta:(dl >= 0 ? '+' : '−') + Math.abs(dl).toFixed(1) + ' pts vs ' + (n >= 2 ? tr[n - 2][0] : 'prior'), deltaColor: dl > 0 ? 'var(--destructive)' : 'var(--success)' },
+      { label:'Maturing ≤ 90 Days', value:String(mat90.length), delta:this.short(sum(mat90, l => l.upb)) + ' UPB', deltaColor:'var(--muted-dark)' }];
+    const B = [['Current', l => l.status === 'Current', 'var(--success)'], ['1–29 DPD', l => l.status === '1–29 DPD', 'var(--requirement)'], ['30–59 DPD', l => l.status === '30 DPD', 'var(--requirement)'],
+      ['60–89 DPD', l => l.status === '60 DPD', 'var(--destructive-light)'], ['90+ DPD', l => l.status === '90+ DPD', 'var(--destructive)'], ['Matured', l => l.status === 'Matured', 'var(--secondary)'],
+      ['Foreclosure / REO', l => l.status === 'Foreclosure' || l.status === 'REO', 'var(--tertiary)']].map(([label, f, color]) => [label, LS.filter(f).length, color]);
+    const mx = Math.max(1, ...B.map(b => b[1])), tmx = Math.max(0.1, ...tr.map(t => t[1])) * 1.15;
+    return { kpis, buckets: B.map(([label, c, color]) => ({ label, n:c.toLocaleString(), color, w:Math.max(1.5, Math.sqrt(c / mx) * 100) + '%' })),
+      trend: tr.map(([mo, v], i) => ({ m:mo, v:v.toFixed(1) + '%', h:(v / tmx * 100) + '%', color: i === n - 1 ? 'var(--secondary)' : 'var(--primary)' })) };
+  }
+  heatDb() {
+    const G = [['RTL · Flip, Bridge, Build', 'RTL'], ['DSCR Rental', 'DSCR'], ['Multifamily', 'MF']];
+    const col = l => l.status === 'Foreclosure' || l.status === 'REO' ? 4 : l.status === 'Matured' || l.dpd >= 90 ? 3 : l.dpd >= 60 ? 2 : l.dpd >= 30 ? 1 : 0;
+    return G.map(([label, p]) => { const ls = this.LOANS.filter(l => l.prog === p), tot = ls.reduce((t, l) => t + l.upb, 0) || 1;
+      return { label, upb:this.short(tot), cells:[0, 1, 2, 3, 4].map(j => { const c = ls.filter(l => col(l) === j), u = c.reduce((t, l) => t + l.upb, 0);
+        if (j === 0) return { n:c.length.toLocaleString(), upb:this.short(u), bg:'hsla(149,56%,30%,.12)', fg:'var(--tertiary)' };
+        const a = Math.min(1, 0.12 + u / tot * 22); return { n:c.length, upb:this.short(u), bg:'hsla(3,74%,35%,' + a.toFixed(2) + ')', fg: a > 0.55 ? '#fff' : 'var(--tertiary)' }; }) }; });
+  }
+  exportLoans(rows) {
+    const H = ['Loan','Borrower','Guarantor','Type','Product','Property','State','UPB','Rate','Status','DPD','Next Due','Maturity','Investor'];
+    const q = v => { const t = String(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const csv = [H, ...rows.map(l => [l.id, l.borrower, l.guarantor, l.type, l.product || '', l.property, l.state || '', l.upb, l.rate, l.status, l.dpd || 0, l.next, l.maturity, l.investor])].map(r => r.map(q).join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' })); a.download = 'loans.csv'; document.body.appendChild(a); a.click(); a.remove();
+    this.toast('Export ready', rows.length.toLocaleString() + ' loans · loans.csv');
+  }
+
+  // ---- Payments ----
+  allocDb(L, amt, short) {
+    const I = L.int, P = L.prin, E = L.esc;
+    if (short) return [['Late charges', 0], ['Interest', 0], ['Scheduled principal', 0], ['Escrow', 0], ['Suspense', amt]];
+    const i = Math.min(amt, I), p = Math.min(Math.max(amt - I, 0), P), e = Math.min(Math.max(amt - I - P, 0), E);
+    return [['Late charges', 0], ['Interest', i], ['Scheduled principal', p], ['Escrow', e], ['Principal curtailment', Math.max(amt - I - P - E, 0)], ['Suspense', 0]];
+  }
+  postPaymentDb(L, amt, short) {
+    const A = this.D.asof, MT = { Wire:'wire', ACH:'ach', Check:'check', Lockbox:'check' }[this.state.payMethod] || 'wire';
+    const BK = { 'Interest':'interest', 'Scheduled principal':'principal', 'Escrow':'escrow', 'Principal curtailment':'principal', 'Suspense':'suspense' };
+    const apps = this.allocDb(L, amt, short).filter(([k, v]) => BK[k] && v > 0.004).map(([k, v]) => [BK[k], Math.round(v * 100) / 100]);
+    const prin = apps.filter(x => x[0] === 'principal').reduce((t, x) => t + x[1], 0);
+    this.dbWrite(async q => {
+      const r = await q("INSERT INTO payment (loan_id, payment_received_date, effective_date, payment_amount, payment_method_type, status, posted_by, posted_at) VALUES ($1, $2::date, $2::date, $3, $4, 'posted', 'M. Ortiz', now()) RETURNING payment_id", [L.loanId, A, amt, MT]);
+      const pid = Number(r.rows[0].payment_id);
+      for (const [b, v] of apps) await q("INSERT INTO payment_application (payment_id, bucket, applied_amount, schedule_id) SELECT $1, $2, $3, (SELECT s.schedule_id FROM loan_schedule s JOIN loan l ON l.loan_id = s.loan_id WHERE s.loan_id = $4 AND s.payment_due_date = l.next_payment_due_date LIMIT 1)", [pid, b, v, L.loanId]);
+      if (short) {
+        await q("INSERT INTO suspense_balance (loan_id, posted_date, suspense_amount, reason) VALUES ($1, $2::date, $3, 'partial payment held pending full installment')", [L.loanId, A, amt]);
+        await q("INSERT INTO payment_exception (payment_id, loan_id, exception_type, detected_date, description, status) VALUES ($1, $2, 'short_pay', $3::date, $4, 'open')", [pid, L.loanId, A, 'Received ' + this.m(amt) + ' against ' + this.m(L.due) + ' due; held in suspense']);
+      } else {
+        await q("UPDATE loan l SET actual_loan_balance = actual_loan_balance - $2, last_payment_received_date = $3::date, updated_at = now(), next_payment_due_date = COALESCE((SELECT min(s.payment_due_date) FROM loan_schedule s WHERE s.loan_id = l.loan_id AND s.payment_due_date > l.next_payment_due_date), (l.next_payment_due_date + interval '1 month')::date) WHERE loan_id = $1", [L.loanId, prin, A]);
+      }
+    }, 'Payment posted', L.id + ' · ' + this.m(amt) + (short ? ' held in suspense' : ' applied'));
+  }
+  resolveException(k, action, id) {
+    const RA = { Apply:'apply_waterfall', Reverse:'reverse_payment', Match:'matched', Return:'return_funds', Suspense:'post_to_suspense' };
+    this.dbWrite(q => q("UPDATE payment_exception SET status = 'resolved', resolution_action = $2, resolved_by = 'M. Ortiz', resolved_at = now() WHERE exception_id = $1", [k, RA[action] || 'apply_waterfall']),
+      action === 'Suspense' ? 'Moved to suspense' : action + ' · ' + (id === '—' ? 'receipt' : id), 'Exception resolved and removed from the queue.');
+  }
+  batchDb(exceptions) {
+    const B = this.D.BATCH;
+    return [{ k:'Receipts', v:B.receipts.toLocaleString(), sub:this.m(B.total, 0) + ' total', color:'var(--tertiary)' },
+      { k:'Auto-applied', v:String(Math.max(0, B.receipts - exceptions.length)), sub:'Matched to loan + amount', color:'var(--success)' },
+      { k:'Exceptions', v:String(exceptions.length), sub:'Manual review', color: exceptions.length ? 'var(--requirement)' : 'var(--success)' },
+      { k:'In Suspense', v:this.m(B.suspenseAmt, 0), sub:B.suspenseN + (B.suspenseN === 1 ? ' loan' : ' loans'), color:'var(--tertiary)' }];
+  }
+
+  // ---- Escrow ----
+  escKpisDb() {
+    const K = this.D.ESC_KPI;
+    return [{ k:'UPB with Tax or Insurance Issues', v:this.short(K.sigUpb), sub:'Loans with an open tax or insurance signal' }, { k:'Escrow Accounts', v:String(K.escLoans), sub:this.m(K.escBal) + ' on deposit' },
+      { k:'Tax Delinquencies', v:String(K.tax), sub:'Open tax signals' }, { k:'Insurance Lapses', v:String(K.ins), sub:'Open insurance signals' }];
+  }
+  escRowsDb() {
+    const m = this.m.bind(this);
+    return this.D.ESC_ROWS.map(r => ({ id:r.id, borrower:r.borrower, tax: r.escrowBal != null ? m(r.escrowBal) : '—', ins: r.dep ? m(r.dep) : '—', ir: m(r.upb, 0), irSub:'',
+      rr: r.note || '—', next:r.next, nextAmt: r.nextAmt ? m(r.nextAmt) : '', status:r.status, bv:r.bv, openB:this.relClick(r.borrower) }));
+  }
+  escItems(EA) {
+    const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], out = [];
+    (EA.taxes || []).forEach(t => out.push(['Tax', t.due, +t.amt, t.payee || 'Property tax']));
+    (EA.ins || []).forEach(i => out.push(['Insurance', i.due || i.end, +i.amt, (i.carrier || 'Hazard') + ' premium']));
+    return out.filter(x => x[1]).map(([k, d, a, label]) => { const dt = new Date(String(d).slice(0, 10) + 'T00:00:00Z'); return { k, mo:MO[dt.getUTCMonth()], day:dt.getUTCDate(), a, label }; });
+  }
+  escEvents(EA) { const ev = {}; this.escItems(EA).forEach(x => { ev[x.mo] = ev[x.mo] ? [ev[x.mo][0] + ' + ' + x.k, ev[x.mo][1] + x.a] : [x.k, x.a]; }); return ev; }
+  escDisb(EA) { return this.escItems(EA).map(x => [x.mo + ' ' + x.day + ' · ' + x.label, x.a]); }
+
+  // ---- Collections ----
+  logContact(c, ptp) {
+    const D = this.D, L = D.byId[c[0]], stage = L.status === 'Foreclosure' ? 'pre_foreclosure' : L.dpd >= 30 || L.status === 'Matured' ? 'collections' : 'early_delinquency';
+    const pd = new Date(Date.parse(D.asof) + 7 * 864e5).toISOString().slice(0, 10), amt = typeof c[3] === 'number' ? Math.round(c[3] * 100) / 100 : null;
+    this.dbWrite(q => q("INSERT INTO collection_activity (loan_id, stage, activity_date, activity_type, result, promise_date, promise_amount, agent) VALUES ($1, $2, $3::date, 'call_contact', $4, $5::date, $6, 'M. Ortiz')",
+      [L.loanId, stage, D.asof, ptp ? 'promise_to_pay' : 'spoke_borrower', ptp ? pd : null, ptp ? amt : null]),
+      ptp ? 'Promise to pay recorded' : 'Call logged', c[0] + (ptp ? ' · ' + this.m(amt || 0) + ' promised by ' + D.fmtS(pd) : ' · contact history updated'));
+  }
+
+  // ---- Maturities and extensions ----
+  openExt(id) { const e = this.D.EXT_BY_LOAN[id]; this.go('maturity', { v:{ ...this.state.v, maturity:'B' }, step:1, extId: e ? e.request_id : this.state.extId }); }
+  approveExt(e) {
+    this.dbWrite(q => q("UPDATE extension_request SET status = 'approved', decision_date = $2::date, decided_by = 'M. Ortiz' WHERE request_id = $1", [e.requestId, this.D.asof]),
+      'Sent for signature', 'Extension approved for ' + e.id + ' and the agreement sent to ' + e.borrower + '.');
+  }
+  extDb(pass, warn) {
+    const D = this.D, S = this.state, m = this.m.bind(this), cap = this.cap;
+    const E = D.EXT.find(e => e.request_id === S.extId) || D.EXT[0]; if (!E) return null;
+    const L = D.byId[E.id], sig = D.SIGNALS[L.id] || [], pj = D.PROJ[L.id], ltv = Math.round(L.upb / L.value * 100);
+    const nm = new Date(D.iso(E.current_maturity_date) + 'T00:00:00Z'); nm.setUTCMonth(nm.getUTCMonth() + (E.requested_months || 6));
+    const rate2 = E.proposed_rate || L.rate + 0.5, fee = (E.fee_pct || 1) / 100 * L.upb, st = E.status, bs = /balance sheet/i.test(L.investor) || L.investorType === 'balance_sheet';
+    const SBV = { received:'outline', under_review:'secondary', priced:'secondary', approved:'success', declined:'destructive' };
+    const drift = sig.find(s => /Payment timing/.test(s.type)), ins = sig.find(s => /Insurance/.test(s.type));
+    return {
+      ext: { requestId:E.request_id, id:E.id, maturity:E.maturityF, status:cap(st), statusBv:SBV[st] || 'outline', borrower:L.borrower, openB:this.relClick(L.borrower), guarantor:L.guarantor, openG:this.relClick(L.guarantor),
+        investor:L.investor, received:E.requestedF + (E.pricedF ? ' · priced ' + E.pricedF : ''), term:E.requested_months + ' months', conditions:E.conditions || 'None stated',
+        narrative:(E.notes ? cap(E.notes) + '. ' : '') + L.type + ' loan, ' + m(L.upb, 0) + ' UPB, ' + L.status.toLowerCase() + '.' + (pj ? ' Project ' + pj.insp + '% complete per the ' + pj.inspDate + ' inspection.' : ''),
+        consentNote: bs ? 'Balance sheet loan · no investor consent required.' : 'Whole-loan investor consent required from ' + L.investor + ' under the servicing agreement.' },
+      pick: D.EXT.filter(e => ['received','under_review','priced'].includes(e.status) || e.request_id === E.request_id).map(e => ({ label:e.id, state: e.request_id === E.request_id ? 'active' : '', go: () => this.setState({ extId:e.request_id, step:1 }) })),
+      elig: [
+        { ...(L.dpd === 0 ? pass : warn), k:'No monetary default', req:'Current on all payments', v: L.dpd ? L.dpd + ' DPD' : 'Current' },
+        { ...(drift ? warn : pass), k:'Payment history', req:'No payment timing drift flagged', v: drift ? 'Drift flagged ' + drift.date : 'No drift' },
+        { ...(ltv <= 75 ? pass : warn), k:'Loan-to-value', req:'≤ 75% on current as-is value', v: ltv + '% (' + this.short(L.value) + ' ' + L.valueSrc + ')' },
+        { ...(!pj || pj.insp >= 100 ? pass : warn), k:'Project completion', req:'Rehab 100% complete or on budget', v: pj ? pj.insp + '% complete' : 'No rehab scope' },
+        { ...(ins ? warn : pass), k:'Insurance', req:'Coverage through extended maturity', v: ins ? 'Lapse flagged ' + ins.date : 'No lapse on file' } ],
+      terms: [{ k:'Maturity', a:E.maturityF, b:D.fmt(nm) }, { k:'Note rate', a:L.rate.toFixed(3) + '%', b:rate2.toFixed(3) + '%' }, { k:'Monthly interest', a:m(L.upb * L.rate / 1200), b:m(L.upb * rate2 / 1200) },
+        { k:'Extension fee', a:'—', b:(E.fee_pct || 1).toFixed(2) + '% · ' + m(fee) }, { k:'Interest reserve', a: L.ir ? m(L.ir, 0) : '—', b:E.conditions || 'Per credit approval' }],
+      approvals: [
+        { i:'AM', role:'Asset Manager', who: E.pricedF ? 'Pricing drafted ' + E.pricedF : 'Awaiting pricing', status: E.pricedF ? 'Approved' : 'Pending', bv: E.pricedF ? 'success' : 'warning' },
+        { i:'CR', role:'Credit', who: st === 'approved' ? (E.decided_by || '—') + ' · ' + D.fmt(E.decision_date) : st === 'declined' ? 'Declined ' + D.fmt(E.decision_date) : 'Awaiting decision',
+          status: st === 'approved' ? 'Approved' : st === 'declined' ? 'Declined' : 'Pending', bv: st === 'approved' ? 'success' : st === 'declined' ? 'destructive' : 'warning' },
+        { i:'IN', role:'Investor Consent', who: bs ? 'Not required · balance sheet' : L.investor, status: bs ? 'N/A' : st === 'approved' ? 'Approved' : 'Pending', bv: bs ? 'outline' : st === 'approved' ? 'success' : 'warning' },
+        { i:'MO', role:'Servicing', who:'M. Ortiz', status: st === 'approved' ? 'Complete' : 'Waiting', bv: st === 'approved' ? 'success' : 'outline' } ],
+      docs: [{ k:'Loan Modification & Extension Agreement', sub:'Generated ' + D.asofS + ' · ' + E.requested_months + '-month term', status: st === 'approved' ? 'Sent' : 'Ready', bv:'success' },
+        { k:'Guarantor Reaffirmation', sub:L.guarantor, status:'Ready', bv:'success' }, { k:'Borrower Notice of Terms', sub:'Email + portal', status: st === 'approved' ? 'Sent' : 'Draft', bv:'outline' }] };
+  }
   dbq(sql, params, nonce) {
     const key = sql + '\u0000' + JSON.stringify(params || []) + '\u0000' + (nonce || '');
     if (this._qc[key]) return this._qc[key];
@@ -1494,7 +1793,7 @@ class Component extends DCLogic {
     { id:'BPL-100744', borrower:'Kessler Development', guarantor:'Ruth Kessler', property:'311 Pine St, Atlanta, GA 30308', ptype:'Multifamily (18)', type:'Bridge', upb:3300000, rate:10.75, status:'Matured', investor:'Balance Sheet', maturity:'Sep 1, 2026', orig:'Sep 1, 2024', next:'Paid to Sep 1', value:4600000, io:true },
     { id:'BPL-104395', borrower:'Redline Homes LLC', guarantor:'Tomas Greer', property:'27 Birch Rd, Phoenix, AZ 85008', ptype:'Single Family', type:'Fix & Flip', upb:298000, rate:11.90, status:'90+ DPD', investor:'Harbor Point Capital', maturity:'Dec 31, 2026', orig:'Jan 5, 2026', next:'Jun 1, 2026', value:360000, arv:455000, io:true }
   ];
-  BV = { 'Current':'success', '30 DPD':'warning', '60 DPD':'destructive', '90+ DPD':'destructive', 'Forbearance':'secondary', 'Matured':'navy' };
+  BV = { 'Current':'success', '1–29 DPD':'warning', '30 DPD':'warning', '60 DPD':'destructive', '90+ DPD':'destructive', 'Forbearance':'secondary', 'Matured':'navy', 'Foreclosure':'navy', 'REO':'secondary' };
   NAV = [
     { key:'dashboard', label:'Portfolio', icon:'house-simple', title:'Portfolio', crumb:'Servicing' },
     { key:'loan', label:'Loan Record', icon:'buildings', title:'Loan Record', crumb:'Servicing / Loans' },
@@ -1564,6 +1863,7 @@ class Component extends DCLogic {
   hash(s) { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
   short(u) { return u >= 1e6 ? '$' + (u / 1e6).toFixed(2) + 'M' : '$' + Math.round(u / 1000) + 'K'; }
   relFor(name) {
+    if (this.D) return this.relDb(name);
     const rich = this.RELS.find(r => r.guarantors.some(g => g.name === name) || r.loans.some(l => l.entity === name));
     if (rich) return rich;
     if (this._syn[name]) return this._syn[name];
@@ -1622,7 +1922,7 @@ class Component extends DCLogic {
   }
   relClick(name) { return e => { if (e && e.stopPropagation) e.stopPropagation(); this.openRel(name); }; }
   relView(rel, S) {
-    const m = this.m.bind(this), PORT = 1180200000, d = this.relDowns(rel);
+    const m = this.m.bind(this), PORT = this.D ? this.D.portUpb : 1180200000, d = this.relDowns(rel);
     const cur = l => l.changes.length ? l.changes[l.changes.length - 1][3] : l.tier0;
     const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
     const L = rel.loans, upb = sum(L, l => l.upb), unf = sum(L, l => l.unfunded), pmt = sum(L, l => l.pmt);
@@ -1630,10 +1930,10 @@ class Component extends DCLogic {
     const kpis = [
       { k:'Total UPB', v:m(upb, 0), sub:L.length + ' loans · ' + ents.length + ' entities', color:'var(--tertiary)' },
       { k:'Total Exposure', v:m(upb + unf, 0), sub: unf ? 'Includes ' + m(unf, 0) + ' unfunded holdbacks' : 'No unfunded commitments', color:'var(--tertiary)' },
-      { k:'Share of Portfolio', v:(upb / PORT * 100).toFixed(2) + '%', sub:'of $1.18B serviced UPB', color:'var(--tertiary)' },
+      { k:'Share of Portfolio', v:(upb / PORT * 100).toFixed(2) + '%', sub:'of ' + (this.D ? this.big(PORT) : '$1.18B') + ' serviced UPB', color:'var(--tertiary)' },
       { k:'Monthly Debt Service', v:m(pmt), sub:'Scheduled P&I and interest', color:'var(--tertiary)' },
       { k:'Watch or Worse', v:String(wow.length), sub: wow.length ? m(sum(wow, l => l.upb), 0) + ' UPB' : 'All loans Pass', color: wow.length ? 'var(--destructive)' : 'var(--success)' } ];
-    const PROG = { DSCR:['DSCR Rental','var(--secondary)'], RTL:['RTL · Bridge and Fix & Flip','var(--primary)'], CRE:['Commercial RE','var(--tertiary)'] };
+    const PROG = { DSCR:['DSCR Rental','var(--secondary)'], RTL:[this.D ? 'RTL · Fix & Flip, Bridge, Construction' : 'RTL · Bridge and Fix & Flip','var(--primary)'], CRE:[this.D ? 'Multifamily' : 'Commercial RE','var(--tertiary)'] };
     const mix = ['DSCR','RTL','CRE'].map(p => { const ls = L.filter(l => l.prog === p), u = sum(ls, l => l.upb);
       return { label:PROG[p][0], color:PROG[p][1], n:ls.length + (ls.length === 1 ? ' loan' : ' loans'), upb:this.short(u), pct:Math.round(u / upb * 100) + '%', w:(u / upb * 100) + '%', u }; }).filter(x => x.u > 0);
     const grp = key => { const g = {}; L.forEach(l => { g[l[key]] = g[l[key]] || { k:l[key], u:0, n:0 }; g[l[key]].u += l.upb; g[l[key]].n++; });
@@ -1650,7 +1950,7 @@ class Component extends DCLogic {
     const Lf = L.filter(l => !S.relEntity || l.entity === S.relEntity);
     const rows = Lf.map(l => { const t = cur(l), wd = d.win.filter(e => e.l === l).pop(), lc = l.changes[l.changes.length - 1];
       return { id:l.id, entity:l.entity, loc:l.city + ', ' + l.state, open: () => this.openRelLoan(l, rel), openE: () => this.setState({ relEntity: S.relEntity === l.entity ? null : l.entity }),
-        prog: l.prog === 'RTL' ? 'RTL · ' + l.type : l.prog === 'DSCR' ? 'DSCR Rental' : 'Commercial RE',
+        prog: l.prog === 'RTL' ? 'RTL · ' + l.type : l.prog === 'DSCR' ? 'DSCR Rental' : this.D ? 'Multifamily' : 'Commercial RE',
         progSub: l.dscr ? 'DSCR ' + l.dscr : l.unfunded ? 'Holdback ' + this.short(l.unfunded) + ' unfunded' : 'Fully funded',
         upbF:m(l.upb, 0), pmtF:m(l.pmt), next:l.next, status:l.status, bv:this.BV[l.status] || 'outline', maturity:l.maturity,
         tier:t, tierColor:this.TIER_DOT[t], down:!!wd, tierSub: wd ? 'from ' + wd.from + ' · ' + wd.date : lc ? 'since ' + lc[0] : 'since origination', tierSubColor: wd ? 'var(--destructive)' : 'var(--muted-dark)' }; });
@@ -1680,7 +1980,12 @@ class Component extends DCLogic {
 
   STRAT = { 'Modification':0.22, 'Forbearance':0.28, 'Discounted Payoff':0.45, 'Short Sale':0.55, 'Deed-in-Lieu':0.68, 'Note Sale':0.74, 'Foreclosure / REO':1 };
   LOSS_IN = { 'BPL-104395':[298000,11.9,360000,9], 'BPL-104011':[412500,12.0,505000,30], 'BPL-102190':[6400000,9.4,8400000,8], 'BPL-103118':[1840000,10.25,2350000,28], 'BPL-104602':[620000,11.5,760000,20], 'BPL-101455':[3950000,10.5,4600000,16], 'BPL-100902':[5200000,9.75,6300000,12] };
-  lossBase(id) { const x = this.LOSS_IN[id]; if (!x) return null; const [upb, rate, value, mo] = x;
+  lossBase(id) { const la = this.D && this.D.ANALYSIS[id];
+    if (la) { const sell = la.gross * la.sell_pct / 100;
+      return { total: la.loss, mo: Math.round(la.carry_mo), parts: [['Unpaid principal', la.bal], ['Accrued interest', la.accrued], ...(la.advances ? [['Servicing advances', la.advances]] : []),
+        ['Foreclosure and legal · ' + String(la.process || '').replace('_', '-'), la.legal], ['Carry: tax, insurance, upkeep · ' + la.carry_mo + ' mo', la.carry_m * la.carry_mo],
+        ['Disposition costs · ' + la.sell_pct + '%', sell], ['Less REO proceeds · ' + (100 - la.reo_disc) + '% of value', -la.gross]] }; }
+    const x = this.LOSS_IN[id]; if (!x) return null; const [upb, rate, value, mo] = x;
     const reo = value * 0.82, acc = upb * rate / 1200 * mo, legal = 15000 + upb * 0.006, carry = value * 0.028 * mo / 12, disp = reo * 0.07;
     return { total: Math.max(0, upb + acc + legal + carry + disp - reo), mo, parts: [['Unpaid principal', upb], ['Accrued interest · ' + mo + ' mo to REO sale', acc], ['Foreclosure and legal', legal], ['Carry: tax, insurance, upkeep', carry], ['Disposition costs · 7%', disp], ['Less REO proceeds · 82% of value', -reo]] }; }
   RESOLVED = [
@@ -1736,6 +2041,7 @@ class Component extends DCLogic {
       ti:[['Property tax','Paid via escrow','Next installment Nov 10, 2026 · $6,140','ok'],['Hazard insurance','Renewal due Oct 10','Quoted premium +38% · not yet bound','warn'],['Escrow account','Shortage flagged','Premium increase exceeds cushion','warn']] }
   };
   healthCalc(L) {
+    if (this.D) return this.healthDb(L);
     const c = this.state.hcfg, num = x => parseFloat(String(x).replace(/[^0-9.\-]/g, '')) || 0, thr = num(c.thr), buf = num(c.buf), occT = num(c.occ), expT = num(c.exp);
     const P = ['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026','Q3 2026'], h = this.hash(L.id), um = (L.ptype || '').match(/\((\d+)\)/), target = parseFloat(L.dscr) || 1.3;
     let pr = this.HP[L.id];
@@ -1763,8 +2069,9 @@ class Component extends DCLogic {
     return { P, rows, d, occP, falling2, proj, breached, flags, exp, pr, thr, buf, expT, DSq, u };
   }
   healthView(L) {
-    if (L.type !== 'DSCR') return null;
-    const H = this.healthCalc(L), m = this.m.bind(this), X = v => v.toFixed(2) + 'x', c = this.state.hcfg;
+    if (this.D ? !this.D.HEALTH[L.id] : L.type !== 'DSCR') return null;
+    const H = this.healthCalc(L); if (!H) return null;
+    const H_ = H, m = this.m.bind(this), X = v => v.toFixed(2) + 'x', c = this.state.hcfg;
     const status = H.breached ? ['Covenant breached','destructive'] : H.flags.length ? ['Early warning','warning'] : ['Healthy','success'];
     const bars = H.d.map((v, i) => ({ p:H.P[i], v:X(v), val:v, proj:false }));
     if (H.falling2 && !H.breached) bars.push({ p:'Q4 2026 proj.', v:X(H.proj), val:H.proj, proj:true });
@@ -1772,7 +2079,8 @@ class Component extends DCLogic {
     const col = v => v < H.thr ? 'var(--destructive)' : v < H.thr + H.buf ? 'var(--requirement)' : 'var(--primary)';
     const setC = k => e => { const val = e.target.value; this.setState(s => ({ hcfg:{ ...s.hcfg, [k]:val } })); };
     const SEV = { high:['warning-octagon','var(--destructive)','hsla(3,74%,35%,.05)','hsla(3,74%,35%,.4)'], med:['warning','var(--requirement)','var(--requirement-light)','hsla(40,98%,43%,.5)'] };
-    return { statusText:status[0], statusBv:status[1], covText:'Covenant DSCR ≥ ' + X(H.thr) + ', tested quarterly · ' + H.P[5] + ' result ' + X(H.d[5]) + (H.breached ? ' · Fail' : ' · Pass'),
+    const lp = H.P.length - 1;
+    return { statusText:status[0], statusBv:status[1], covText:'Covenant DSCR ≥ ' + X(H.thr) + ', tested quarterly · ' + H.P[lp] + ' result ' + X(H.d[lp]) + (H.breached ? ' · Fail' : ' · Pass'),
       flags:H.flags.map(f => ({ title:f.title, text:f.text, icon:SEV[f.sev][0], color:SEV[f.sev][1], bg:SEV[f.sev][2], bd:SEV[f.sev][3] })), noFlags:!H.flags.length,
       dscrBars:bars.map(b => ({ p:b.p, v:b.v, h:(b.val / mx * 100) + '%', bg: b.proj ? 'transparent' : col(b.val), bd: b.proj ? '1.5px dashed ' + col(b.val) : '0' })),
       thrBottom:(H.thr / mx * 100) + '%', bufH:(H.buf / mx * 100) + '%', thrLabel:X(H.thr),
@@ -1780,7 +2088,7 @@ class Component extends DCLogic {
       rent:H.rows.map(r => ({ p:r.p, units:H.u, occ:r.occ, occPct:r.occPct + '%', avg:m(r.rent, 0), gpr:m(r.gpr, 0), vac:m(-r.vac, 0), bd:m(-r.bd, 0), egi:m(r.egi, 0), noi:m(r.noi, 0), dscr:X(r.dscr), dc:col(r.dscr) })),
       exp:H.exp.map(e => ({ label:e.label, prior:m(e.prior, 0), cur:m(e.cur, 0), chg:(e.chg >= 0 ? '+' : '−') + Math.abs(e.chg).toFixed(1) + '%', chgColor: e.f !== 'opex' && e.chg > H.expT ? 'var(--destructive)' : 'var(--tertiary)', fw: e.f === 'opex' ? 600 : 400 })),
       ti:H.pr.ti.map(([k, v, sub, st]) => ({ k, v, sub, icon: st === 'ok' ? 'check-circle' : 'warning-circle', color: st === 'ok' ? 'var(--success)' : 'var(--requirement)' })),
-      leases:H.pr.leases + (H.pr.leases === 1 ? ' lease expires' : ' leases expire') + ' within 90 days', dsF:m(H.DSq, 0),
+      leases: H.pr.leases == null ? H.u + (H.u === 1 ? ' unit' : ' units') + ' on the rent roll' : H.pr.leases + (H.pr.leases === 1 ? ' lease expires' : ' leases expire') + ' within 90 days', dsF:m(H.DSq, 0),
       cfg:[['thr','Covenant DSCR','x'],['buf','Early-warning buffer','x'],['occ','Occupancy drop trigger','pts'],['exp','Expense growth trigger','%']].map(([k, label, unit]) => ({ label, unit, value:String(c[k]), set:setC(k) })),
       flagCount:H.flags.length, breached:H.breached };
   }
@@ -1837,12 +2145,13 @@ class Component extends DCLogic {
       'Project Completion': F.prog !== 'RTL' ? 'Stabilized ' + (F.prog === 'DSCR' ? 'rental' : 'commercial') + ' asset; no construction scope to complete.' : F.rehab >= 100 ? 'Rehab is complete; no remaining scope to fund.' : null,
       'Asset Sale': null,
       'Walk-Away': netREO > upb * 0.1 ? 'First-lien collateral nets ' + this.short(netREO) + ' after sale costs; releasing the lien forfeits that recovery.' : null };
+    if (F.dbWhy) Object.keys(F.dbWhy).forEach(k => { if (k !== 'Walk-Away' || F.dbWhy[k]) why[k] = F.dbWhy[k]; });
     const pBase = F.dpd >= 90 ? 35 : F.dpd >= 60 ? 50 : 65;
     const def = {
       'Modification': { cut:200, term:12, wd:0, costs:7500, p:pBase, T:2 },
       'Discounted Payoff': { pct:Math.min(95, Math.round(value * 0.88 / claim(3) * 100)), costs:10000, p:60, T:3 },
       'Rent Redirection': { rent:F.rent, collect:85, opex:35, fee:5, setup:15000, p:80, T:mo },
-      'Deficiency Judgment': { collect:Math.min(70, Math.round(F.liq * 0.5 / Math.max(B, 1) * 100)), pJ:85, legal:35000, T:12 },
+      'Deficiency Judgment': { collect: F.collect != null ? Math.round(F.collect) : Math.min(70, Math.round(F.liq * 0.5 / Math.max(B, 1) * 100)), pJ:85, legal:35000, T:12 },
       'UCC Foreclosure': { real:93, liab:40000, costs:25000, p:75, T:3 },
       'Project Completion': { ctc:F.ctc || 0, arv:F.arv || value, sale:7, Tb:4, Ts:3, carry:Math.round(carryM), p:75 },
       'Asset Sale': { bid:Math.min(95, Math.round(value * 0.78 / upb * 100)), fee:1.5, p:90, T:2 },
@@ -1859,6 +2168,7 @@ class Component extends DCLogic {
   toast(title, desc) { clearTimeout(this._t); this.setState({ toast: { title, desc } }); this._t = setTimeout(() => this.setState({ toast: null }), 3200); }
 
   loanView(L) {
+    if (this.D) return this.loanViewDb(L);
     const r = L.rate / 100, int = L.io ? L.upb * r / 12 : L.upb * (r / 12) / (1 - Math.pow(1 + r / 12, -360));
     const esc = Math.round(L.upb * 0.0015), due = int + esc, ltv = Math.round(L.upb / L.value * 100);
     const perDiem = L.upb * r / 360;
@@ -1923,7 +2233,7 @@ class Component extends DCLogic {
   }
 
   renderVals() {
-    const S = this.state, m = this.m.bind(this), V = S.v;
+    const S = this.state, m = this.m.bind(this), V = S.v, DB = this.D;
     const navW = S.navCollapsed ? 64 : 240;
     const nav = this.NAV.map(n => {
       const a = S.screen === n.key;
@@ -1945,7 +2255,7 @@ class Component extends DCLogic {
     };
 
     // Portfolio
-    const kpis = [
+    let kpis = [
       { label:'Unpaid Principal', value:'$1.18B', delta:'+$22.4M vs Aug', deltaColor:'var(--success)' },
       { label:'Active Loans', value:'2,334', delta:'+41 boarded · 29 paid off', deltaColor:'var(--muted-dark)' },
       { label:'WA Coupon', value:'9.62%', delta:'−4 bps vs Aug', deltaColor:'var(--muted-dark)' },
@@ -1953,15 +2263,19 @@ class Component extends DCLogic {
       { label:'Maturing ≤ 90 Days', value:'161', delta:'$96.8M UPB', deltaColor:'var(--muted-dark)' }
     ];
     const bk = [['Current',2234,'var(--success)'],['30–59 DPD',56,'var(--requirement)'],['60–89 DPD',23,'var(--destructive-light)'],['90+ DPD',13,'var(--destructive)'],['Foreclosure',8,'var(--tertiary)']];
-    const buckets = bk.map(([label, n, color]) => ({ label, n: n.toLocaleString(), color, w: Math.max(1.5, Math.sqrt(n / 2234) * 100) + '%' }));
+    let buckets = bk.map(([label, n, color]) => ({ label, n: n.toLocaleString(), color, w: Math.max(1.5, Math.sqrt(n / 2234) * 100) + '%' }));
     const tr = [['Apr',3.6],['May',3.8],['Jun',3.9],['Jul',4.1],['Aug',4.0],['Sep',4.3]];
-    const trend = tr.map(([mo, v], i) => ({ m: mo, v: v.toFixed(1) + '%', h: (v / 4.6 * 100) + '%', color: i === 5 ? 'var(--secondary)' : 'var(--primary)' }));
+    let trend = tr.map(([mo, v], i) => ({ m: mo, v: v.toFixed(1) + '%', h: (v / 4.6 * 100) + '%', color: i === 5 ? 'var(--secondary)' : 'var(--primary)' }));
     const tf = S.typeFilter;
-    const typeTabs = ['All','Bridge','Fix & Flip','DSCR','CRE'].map(t => ({ label:t, state: tf === t ? 'active' : '', go: () => this.setState({ typeFilter:t }) }));
-    const loanRows = this.LOANS.filter(l => tf === 'All' || l.type === tf).map(l => ({ ...l, upbF:m(l.upb, 0), rateF:l.rate.toFixed(2) + '%', bv:this.BV[l.status], open: () => this.openLoan(l.id), openB:this.relClick(l.borrower) }));
-    const loanCountLabel = tf === 'All' ? 'Showing 8 of 2,334 loans' : 'Showing ' + loanRows.length + ' ' + tf + ' loans';
+    const typeTabs = (DB ? ['All','Fix & Flip','Bridge','Construction','DSCR','Multifamily'] : ['All','Bridge','Fix & Flip','DSCR','CRE']).map(t => ({ label:t, state: tf === t ? 'active' : '', go: () => this.setState({ typeFilter:t }) }));
+    const sq = (S.search || '').trim().toLowerCase(), loanMatch = this.LOANS.filter(l => (tf === 'All' || l.type === tf) && (!sq || [l.id, l.borrower, l.guarantor, l.property].some(x => String(x || '').toLowerCase().includes(sq))));
+    const loanRows = loanMatch.slice(0, DB ? 50 : 8).map(l => ({ ...l, upbF:m(l.upb, 0), rateF:l.rate.toFixed(2) + '%', bv:this.BV[l.status], open: () => this.openLoan(l.id), openB:this.relClick(l.borrower) }));
+    const loanCountLabel = !DB ? (tf === 'All' ? 'Showing 8 of 2,334 loans' : 'Showing ' + loanRows.length + ' ' + tf + ' loans')
+      : 'Showing ' + loanRows.length + ' of ' + loanMatch.length.toLocaleString() + (tf === 'All' ? '' : ' ' + tf) + ' loans' + (sq ? ' matching "' + S.search.trim() + '"' : '') + ' · largest UPB first';
+    const loanPageLabel = DB ? 'Page 1 of ' + Math.max(1, Math.ceil(loanMatch.length / 50)) : 'Page 1 of 292';
+    if (DB) ({ kpis, buckets, trend } = this.portfolioDb(m));
 
-    const TG = {
+    const TG = DB ? { ...DB.TG } : {
       exceptions:{ label:'Payment Exceptions', icon:'warning-circle', count:14, desc:'Unapplied or mismatched receipts from batch 0925-A', items:[
         ['BPL-102190','Oakmont Retail Partners','Short pay','warning','Received $42,000.00 against $58,020.14 due. Hold in suspense or apply per note?','Cutoff 4:00 PM','Review'],
         ['BPL-104602','Ashby Capital Group','Unidentified','secondary','Wire memo "ASHBY 1Q" — no loan match. Two candidate loans.','Cutoff 4:00 PM','Match'],
@@ -1985,24 +2299,24 @@ class Component extends DCLogic {
         ['BPL-101876','Bayview Industrial LLC','Oct 12','outline','Property and liability. Broker contacted Sep 15.','17 days','Request'],
         ['BPL-104395','Redline Homes LLC','Oct 3','destructive','Builder\'s risk. Force-placed coverage review.','8 days','Request'] ] }
     };
-    const hl = [...this.LOANS.filter(l => l.type === 'DSCR').map(l => [l, null]), ...this.RELS.flatMap(r => r.loans.filter(l => l.prog === 'DSCR').map(l => [this.toLoan(l, r), r]))]
-      .map(([l, src]) => ({ l, src, hv:this.healthCalc(l) })).filter(x => x.hv.flags.length).sort((a, b) => b.hv.breached - a.hv.breached);
-    TG.health = { label:'Property Health Warnings', icon:'heartbeat', count:hl.length, desc:'DSCR loans with early-warning or covenant flags for Q3 2026', items:hl.map(x => [x.l.id, x.l.borrower, x.hv.breached ? 'Covenant breached' : 'Early warning', x.hv.breached ? 'destructive' : 'warning', x.hv.flags.map(f => f.title).join(' · '), 'Q3 2026 test', 'Review', null, () => this.openHealth(x.l, x.src)]) };
+    const hl = (DB ? this.LOANS.filter(l => DB.HEALTH[l.id]).map(l => [l, null]) : [...this.LOANS.filter(l => l.type === 'DSCR').map(l => [l, null]), ...this.RELS.flatMap(r => r.loans.filter(l => l.prog === 'DSCR').map(l => [this.toLoan(l, r), r]))])
+      .map(([l, src]) => ({ l, src, hv:this.healthCalc(l) })).filter(x => x.hv && x.hv.flags.length).sort((a, b) => b.hv.breached - a.hv.breached);
+    TG.health = { label:'Property Health Warnings', icon:'heartbeat', count:hl.length, desc:'DSCR loans with early-warning or covenant flags for Q3 2026', items:hl.slice(0, DB ? 25 : 99).map(x => [x.l.id, x.l.borrower, x.hv.breached ? 'Covenant breached' : 'Early warning', x.hv.breached ? 'destructive' : 'warning', x.hv.flags.map(f => f.title).join(' · '), 'Q3 2026 test', 'Review', null, () => this.openHealth(x.l, x.src)]) };
     const inboxSummary = Object.values(TG).reduce((t, g) => t + g.count, 0) + ' open items across ' + Object.keys(TG).length + ' queues';
     const taskGroups = Object.entries(TG).map(([k, g]) => {
       const a = S.task === k; return { ...g, bl: a ? 'var(--primary)' : 'transparent', bg: a ? 'var(--primary-light)' : '#fff', fw: a ? 600 : 400,
         pillBg: a ? 'var(--primary-dark)' : 'var(--muted-lightest)', pillFg: a ? '#fff' : 'var(--tertiary)', go: () => this.setState({ task:k }) };
     });
-    const taskSel = TG[S.task];
+    const taskSel = TG[S.task] || TG.exceptions;
     const taskItems = taskSel.items.map(([id, borrower, tag, bv, detail, due, action, relName, fn]) => ({ id, borrower, tag, bv, detail, due, action, openB:this.relClick(borrower),
-      open: () => fn ? fn() : relName ? this.openRel(relName) : this.LOANS.find(l => l.id === id) && this.openLoan(id),
-      act: () => fn ? fn() : relName ? this.openRel(relName) : this.toast(action + ' · ' + id, 'Item assigned to you and opened in the work queue.') }));
+      open: () => fn ? fn() : relName ? this.openRel(relName) : DB && S.task === 'ext' ? this.openExt(id) : this.LOANS.find(l => l.id === id) && this.openLoan(id),
+      act: () => fn ? fn() : relName ? this.openRel(relName) : DB && S.task === 'ext' ? this.openExt(id) : DB && S.task === 'exceptions' ? this.go('payments', { v:{ ...this.state.v, payments:'B' } }) : DB && ['maturity','loss','watch','ins'].includes(S.task) && this.LOANS.find(l => l.id === id) ? this.openLoan(id) : this.toast(action + ' · ' + id, 'Item assigned to you and opened in the work queue.') }));
 
-    const heatCols = ['Current','30–59 DPD','60–89 DPD','90+ DPD','Foreclosure'];
+    const heatCols = DB ? ['Current','30–59 DPD','60–89 DPD','90+ DPD / Matured','Foreclosure / REO'] : ['Current','30–59 DPD','60–89 DPD','90+ DPD','Foreclosure'];
     const HR = [['Bridge / Fix & Flip','$312.4M',[[812,'$288.1M'],[21,'$11.2M'],[9,'$6.1M'],[6,'$4.4M'],[4,'$2.6M']]],
       ['DSCR Rental','$418.9M',[[1104,'$397.0M'],[28,'$11.8M'],[11,'$5.2M'],[5,'$3.1M'],[3,'$1.8M']]],
       ['Commercial RE','$448.9M',[[318,'$415.6M'],[7,'$17.4M'],[3,'$8.9M'],[2,'$4.8M'],[1,'$2.2M']]]];
-    const heatRows = HR.map(([label, upb, cells]) => {
+    const heatRows = DB ? this.heatDb() : HR.map(([label, upb, cells]) => {
       const tot = parseFloat(upb.slice(1));
       return { label, upb, cells: cells.map(([n, u], j) => {
         const share = parseFloat(u.slice(1)) / tot;
@@ -2011,10 +2325,10 @@ class Component extends DCLogic {
         return { n, upb: u, bg: 'hsla(3,74%,35%,' + a.toFixed(2) + ')', fg: a > 0.55 ? '#fff' : 'var(--tertiary)' };
       }) };
     });
-    const W = [['Oct',48,30,10],['Nov',52,22,18],['Dec',61,20,14],['Jan',39,9,6],['Feb',44,6,4],['Mar',57,5,3],['Apr',40,2,1],['May',36,1,0],['Jun',49,1,0],['Jul',55,0,0],['Aug',42,0,0],['Sep',38,0,0]];
-    const wall = W.map(([mo, n, pay, ext]) => ({ m: mo, n, pay, ext, open: n - pay - ext, h: (n / 61 * 100) + '%' }));
+    const W = DB ? DB.WALL : [['Oct',48,30,10],['Nov',52,22,18],['Dec',61,20,14],['Jan',39,9,6],['Feb',44,6,4],['Mar',57,5,3],['Apr',40,2,1],['May',36,1,0],['Jun',49,1,0],['Jul',55,0,0],['Aug',42,0,0],['Sep',38,0,0]];
+    const wallMax = Math.max(1, ...W.map(w => w[1])), wall = W.map(([mo, n, pay, ext]) => ({ m: mo, n, pay, ext, open: n - pay - ext, h: (n / wallMax * 100) + '%' }));
 
-    const RS = this.RESOLVED, MO = ['Apr','May','Jun','Jul','Aug','Sep'];
+    const RS = this.RESOLVED, MO = DB ? DB.RES_MONTHS : ['Apr','May','Jun','Jul','Aug','Sep'], RR = DB ? DB.RES_RANGE : 'Apr–Sep';
     const DIM = { month:[10,'Month'], strategy:[3,'Strategy Type'], state:[2,'State'], analyst:[4,'Analyst'] }, di = DIM[S.lossDim][0];
     const sumR = (a, f) => a.reduce((s, t) => s + f(t), 0), grpR = {};
     RS.forEach(t => { (grpR[t[di]] = grpR[t[di]] || []).push(t); });
@@ -2028,11 +2342,12 @@ class Component extends DCLogic {
     const TB = sumR(RS, t => t[7]), TA = sumR(RS, t => t[11]), TU = sumR(RS, t => t[5]);
     const lossTotal = { n:RS.length, base:m(TB, 0), act:m(TA, 0), prev:m(TB - TA, 0), rate:((TB - TA) / TB * 100).toFixed(1) + '%' };
     const lossDims = Object.entries(DIM).map(([k, v]) => ({ label:v[1], state: S.lossDim === k ? 'active' : '', go: () => this.setState({ lossDim:k }) }));
-    const liveExp = sumR(Object.keys(this.LOSS_IN), id => this.lossBase(id).total), apv = Object.values(S.approvals);
+    const openLoss = DB ? Object.keys(DB.ANALYSIS).filter(id => !RS.some(t => t[0] === id)) : Object.keys(this.LOSS_IN);
+    const liveExp = sumR(openLoss, id => this.lossBase(id).total), apv = Object.values(S.approvals);
     const lossKpis = [
-      { k:'Loss Exposure', dot:'var(--requirement)', v:this.short(liveExp), sub:Object.keys(this.LOSS_IN).length + ' open loans in Collections worklist · live', def:'Projected loss on the foreclosure-to-REO baseline if no alternative action is taken.' },
-      { k:'Loss Severity', dot:'var(--destructive)', v:this.short(TA), sub:(TA / TU * 100).toFixed(1) + '% of UPB · ' + RS.length + ' loans resolved Apr–Sep', def:'Actual realized loss once a loan resolves.' },
-      { k:'Loss Prevention', dot:'var(--success)', v:this.short(TB - TA), sub:((TB - TA) / TB * 100).toFixed(1) + '% of frozen baselines · resolved Apr–Sep', def:'Frozen baseline minus realized loss, recorded at resolution.' },
+      { k:'Loss Exposure', dot:'var(--requirement)', v:this.short(liveExp), sub: DB ? openLoss.length + ' open loss analyses · live' : Object.keys(this.LOSS_IN).length + ' open loans in Collections worklist · live', def:'Projected loss on the foreclosure-to-REO baseline if no alternative action is taken.' },
+      { k:'Loss Severity', dot:'var(--destructive)', v:this.short(TA), sub:(TA / TU * 100).toFixed(1) + '% of UPB · ' + RS.length + ' loans resolved ' + RR, def:'Actual realized loss once a loan resolves.' },
+      { k:'Loss Prevention', dot:'var(--success)', v:this.short(TB - TA), sub:((TB - TA) / TB * 100).toFixed(1) + '% of frozen baselines · resolved ' + RR, def:'Frozen baseline minus realized loss, recorded at resolution.' },
       { k:'Frozen Baselines · Unresolved', dot:'var(--secondary)', v:this.short(sumR(apv, a => a.baseline)), sub:apv.length + ' approved scenarios awaiting resolution', def:'Locked at scenario approval. Prevention is not recorded until the loan resolves.' } ];
     const resolvedRows = RS.filter(t => !lf || t[di] === lf).map(t => { const [id, borrower, st, strategy, analyst, upb, approved, base, proj, resolved, mo, act] = t, v = act - proj, prev = base - act, sg = v > 0 ? '+' : v < 0 ? '−' : '';
       return { id, borrower, openB:this.relClick(borrower), st, strategy, analyst, approved, resolved, baseF:m(base, 0), projF:m(proj, 0), actF:m(act, 0), sev:(act / upb * 100).toFixed(1) + '% of UPB',
@@ -2044,25 +2359,27 @@ class Component extends DCLogic {
     const L = this.loanView(this.LOANS.find(l => l.id === S.loanId) || this._extra[S.loanId] || this.LOANS[0]);
     const loanTabs = [['overview','Overview'],['transactions','Transactions'],['activity','Notes & Activity'], ...(L.hasHealth ? [['health','Property Health']] : [])].map(([k, label]) => ({ label, state: S.loanTab === k ? 'active' : '', go: () => this.setState({ loanTab:k }) }));
     const tab = { overview: S.loanTab === 'overview' || (S.loanTab === 'health' && !L.hasHealth), transactions: S.loanTab === 'transactions', activity: S.loanTab === 'activity', health: S.loanTab === 'health' && L.hasHealth };
-    const checks = [
+    const checks = DB ? this.checksDb(L) : [
       { icon:'check-circle', color:'var(--success)', title:'Late charge terms', desc:'5% charge after 10-day grace consistent with note and state limits.' },
       { icon:'check-circle', color:'var(--success)', title:'Maturity notice timing', desc:'T-90 notice sent Sep 12 within required window.' },
       { icon:'warning-circle', color:'var(--requirement)', title:'Default interest', desc:'Change Statement CS-2291 flags a pending state rule. Review before any default rate is applied.' }
     ];
     const podTabs = [10, 20, 31].map(d => ({ label: 'Oct ' + d, state: S.pod === d ? 'active' : '', go: () => this.setState({ pod:d }) }));
-    const accr = L.perDiem * S.pod, exit = L.io ? L.upb * 0.01 : 0, escBal = 5420;
+    const accr = L.perDiem * S.pod, exit = L.io ? L.upb * 0.01 : 0, escBal = DB ? (DB.ESC_ACCT && DB.ESC_ACCT.id === L.id ? DB.ESC_ACCT.bal : 0) : 5420;
     const payoff = { perDiem: m(L.perDiem), total: m(L.upb + accr + exit + 150 - escBal), lines: [
       { k:'Unpaid principal', v:m(L.upb) }, { k:'Accrued interest · ' + S.pod + ' days', v:m(accr) },
       { k:L.io ? 'Exit fee · 1.00%' : 'Prepayment premium', v:m(exit) }, { k:'Release & recording', v:m(150) }, { k:'Less escrow balance', v:m(-escBal) } ] };
 
     // Payments A
-    const amtN = parseFloat(String(S.amt).replace(/[$,]/g, '')) || 0;
-    const PI = 11625, PE = 1860, PD = PI + PE;
+    const amtS = S.amt == null ? (L.due || 0).toFixed(2) : S.amt, amtN = parseFloat(String(amtS).replace(/[$,]/g, '')) || 0;
+    const PI = DB ? L.int + L.prin : 11625, PE = DB ? L.esc : 1860, PD = PI + PE;
     const short = amtN > 0 && amtN < PD - 0.005;
-    const alloc = short ? [{ k:'Late charges', v:m(0) }, { k:'Interest', v:m(0) }, { k:'Escrow', v:m(0) }, { k:'Principal', v:m(0) }, { k:'Suspense', v:m(amtN) }]
+    const allocDb = DB && this.allocDb(L, amtN, short);
+    const alloc = allocDb ? allocDb.map(([k, v]) => ({ k, v:m(v) })) : short ? [{ k:'Late charges', v:m(0) }, { k:'Interest', v:m(0) }, { k:'Escrow', v:m(0) }, { k:'Principal', v:m(0) }, { k:'Suspense', v:m(amtN) }]
       : [{ k:'Late charges', v:m(0) }, { k:'Interest', v:m(Math.min(amtN, PI)) }, { k:'Escrow', v:m(Math.min(Math.max(amtN - PI, 0), PE)) }, { k:'Principal curtailment', v:m(Math.max(amtN - PD, 0)) }, { k:'Suspense', v:m(0) }];
-    const post = { dueF: m(PD), amtF: m(amtN), alloc, short, shortMsg: m(amtN) + ' is ' + m(PD - amtN) + ' less than the amount due. Funds will be held in suspense until a full installment is available.' };
-    const basePosted = [
+    const post = { id: DB ? L.id : 'BPL-104827', borrower: DB ? L.borrower : 'Crestline Holdings LLC', openB: this.relClick(DB ? L.borrower : 'Crestline Holdings LLC'), nextF: DB ? 'next due ' + L.next : 'next due Oct 1, 2026',
+      effF: DB ? DB.asof.slice(5, 7) + '/' + DB.asof.slice(8) + '/' + DB.asof.slice(0, 4) : '09/25/2026', dueF: m(PD), amtF: m(amtN), alloc, short, shortMsg: m(amtN) + ' is ' + m(PD - amtN) + ' less than the amount due. Funds will be held in suspense until a full installment is available.' };
+    const basePosted = (DB ? DB.POSTED : [
       ['9:41 AM','BPL-101876','Bayview Industrial LLC','Wire',75298.44,'Interest, escrow','J. Park'],
       ['9:12 AM','BPL-103552','Sandoval Rentals LLC','ACH',25114.07,'P&I, escrow','Auto'],
       ['8:58 AM','BPL-102877','Hillcrest Lofts LLC','Lockbox',18402.50,'Interest','Auto'],
@@ -2070,12 +2387,13 @@ class Component extends DCLogic {
       ['8:30 AM','BPL-103040','Delmar Rentals LLC','ACH',9876.31,'P&I, escrow','Auto'],
       ['7:05 AM','BPL-100912','Westshore Retail','Wire',412500.00,'Principal paydown','J. Park'],
       ['6:15 AM','BPL-103666','Castillo Homes','ACH',3914.88,'P&I, escrow','Auto']
-    ].map(([time, id, borrower, method, a, applied, by]) => ({ time, id, borrower, method, amt:m(a), applied, by, bg:'transparent', openB:this.relClick(borrower) }));
-    const posted = [...S.extraPosted, ...basePosted];
-    const postedSummary = posted.length + ' payments · ' + m(563351.20 + S.extraPosted.reduce((s, p) => s + p.n, 0));
+    ]).map(([time, id, borrower, method, a, applied, by]) => ({ time, id, borrower, method, amt:m(a), applied, by, bg:'transparent', openB:this.relClick(borrower) }));
+    const posted = DB ? basePosted : [...S.extraPosted, ...basePosted];
+    const postedSummary = DB ? posted.length + ' payments · ' + m(DB.POSTED_TOTAL) : posted.length + ' payments · ' + m(563351.20 + S.extraPosted.reduce((s, p) => s + p.n, 0));
+    const payMethods = ['Wire','ACH','Check','Lockbox'].map(label => ({ label, state: S.payMethod === label ? 'active' : '', go: () => this.setState({ payMethod:label }) }));
 
     // Payments B
-    const EX = [
+    const EX = DB ? DB.EX : [
       ['e1','Short pay','warning','BPL-102190','Oakmont Retail Partners','Received $42,000.00 · note requires full installment',58020.14,'Aug 1','Apply'],
       ['e2','Unidentified','secondary','—','Wire · memo "ASHBY 1Q"','Candidates: BPL-104602, BPL-104603',6215.00,'Sep 1','Match'],
       ['e3','NSF return','destructive','BPL-103118','Fulton Street Lofts LLC','ACH R01 · insufficient funds',21400.00,'Sep 1','Reverse'],
@@ -2083,10 +2401,10 @@ class Component extends DCLogic {
       ['e5','Payoff funds','navy','BPL-101002','Linwood Partners LLC','Wire matches payoff letter good-through Oct 1',1874322.18,'Payoff','Apply']
     ];
     const exceptions = EX.filter(x => !S.resolved[x[0]]).map(([k, reason, bv, id, borrower, detail, a, due, action]) => ({ reason, bv, id, borrower, detail, amt:m(a), due, action, openB: id === '—' ? undefined : this.relClick(borrower), cursor: id === '—' ? 'default' : 'pointer', deco: id === '—' ? 'none' : 'underline dotted',
-      apply: () => { this.setState(s => ({ resolved:{ ...s.resolved, [k]:1 } })); this.toast(action + ' · ' + (id === '—' ? 'wire' : id), 'Exception cleared from batch 0925-A.'); },
-      suspense: () => { this.setState(s => ({ resolved:{ ...s.resolved, [k]:1 } })); this.toast('Moved to suspense', (id === '—' ? 'Unidentified wire' : id) + ' held pending review.'); } }));
+      apply: () => DB ? this.resolveException(k, action, id) : (this.setState(s => ({ resolved:{ ...s.resolved, [k]:1 } })), this.toast(action + ' · ' + (id === '—' ? 'wire' : id), 'Exception cleared from batch 0925-A.')),
+      suspense: () => DB ? this.resolveException(k, 'Suspense', id) : (this.setState(s => ({ resolved:{ ...s.resolved, [k]:1 } })), this.toast('Moved to suspense', (id === '—' ? 'Unidentified wire' : id) + ' held pending review.')) }));
     const done = EX.length - exceptions.length;
-    const batch = [
+    const batch = DB ? this.batchDb(exceptions) : [
       { k:'Receipts', v:'412', sub:'$8.94M total', color:'var(--tertiary)' },
       { k:'Auto-applied', v:String(398 + done), sub:'Matched to loan + amount', color:'var(--success)' },
       { k:'Exceptions', v:String(14 - done), sub:'Manual review', color: 14 - done > 0 ? 'var(--requirement)' : 'var(--success)' },
@@ -2094,11 +2412,11 @@ class Component extends DCLogic {
     ];
 
     // Escrow
-    const escKpis = [
+    const escKpis = DB ? this.escKpisDb() : [
       { k:'Escrow Balances', v:'$18.6M', sub:'1,902 loans with escrow' }, { k:'Reserve Balances', v:'$41.3M', sub:'Interest, replacement, TI/LC' },
       { k:'Disbursements · 30 Days', v:'$4.2M', sub:'611 tax and insurance items' }, { k:'Shortages Flagged', v:'7', sub:'$48,210 total' }
     ];
-    const escRows = [
+    const escRows = DB ? this.escRowsDb() : [
       ['BPL-104827','Crestline Holdings LLC','$3,420.00','$2,000.00','$37,200.00','3 mo remaining','—','Dec 1 · Tax','$9,820.00','OK','success'],
       ['BPL-103552','Sandoval Rentals LLC','$12,100.00','$6,300.00','—','','—','Dec 1 · Tax','$16,800.00','Shortage','warning'],
       ['BPL-102190','Oakmont Retail Partners','$88,400.00','$21,050.00','—','','$212,000.00','Jan 31 · Tax','$176,800.00','Delinquent','destructive'],
@@ -2106,24 +2424,28 @@ class Component extends DCLogic {
       ['BPL-104011','Northgate Flip Co.','$1,100.00','$640.00','$0.00','Depleted Aug 1','—','Oct 20 · Tax','$4,210.00','Reserve depleted','destructive'],
       ['BPL-103930','Prairie Doors LLC','$4,880.00','$1,120.00','—','','—','Oct 10 · Insurance','$6,140.00','Shortage','warning']
     ].map(([id, borrower, tax, ins, ir, irSub, rr, next, nextAmt, status, bv]) => ({ id, borrower, tax, ins, ir, irSub, rr, next, nextAmt, status, bv, openB:this.relClick(borrower) }));
-    const dep = 3150, cushion = 6300; let bal = 18400;
-    const evts = { 'Dec':['Tax', 16800], 'Mar':['Insurance', 14200], 'Jun':['Tax', 16800] };
+    const EA = DB && DB.ESC_ACCT, EAL = EA && DB.byId[EA.id];
+    const dep = EA ? EA.dep : 3150, cushion = EA ? EA.dep * (EA.cushion_mo || 2) : 6300, bal0 = EA ? EA.bal : 18400; let bal = bal0;
+    const evts = EA ? this.escEvents(EA) : { 'Dec':['Tax', 16800], 'Mar':['Insurance', 14200], 'Jun':['Tax', 16800] };
     const months = ['Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'].map(mo => {
       bal += dep; const e = evts[mo]; if (e) bal -= e[1];
       return { m: mo, bal, event: e ? e[0] : '' };
     });
     const maxB = Math.max(...months.map(x => x.bal)), low = Math.min(...months.map(x => x.bal));
     const shortage = cushion - low, perMo = shortage / 12;
-    const esc = { cushionF: m(cushion, 0), shortF: m(shortage), newF: m(dep + perMo),
+    const annual = Object.values(evts).reduce((t, e) => t + e[1], 0);
+    const esc = { id: EA ? EA.id : 'BPL-103552', borrower: EAL ? EAL.borrower : 'Sandoval Rentals LLC', openB: this.relClick(EAL ? EAL.borrower : 'Sandoval Rentals LLC'), cushionMo: EA ? (EA.cushion_mo || 2) : 2,
+      badge: shortage > 0 ? 'Shortage ' + m(shortage) : 'No shortage', badgeBv: shortage > 0 ? 'destructive' : 'success',
+      cushionF: m(cushion, 0), shortF: m(shortage), newF: m(dep + Math.max(perMo, 0)),
       months: months.map(x => ({ m: x.m, event: x.event, balK: (x.bal < 0 ? '−' : '') + '$' + (Math.abs(x.bal) / 1000).toFixed(1) + 'k',
         posH: x.bal > 0 ? (x.bal / maxB * 100) + '%' : '0%', negH: x.bal < 0 ? Math.max(8, Math.abs(x.bal) / maxB * 180) + 'px' : '0px',
         color: x.bal < cushion ? 'var(--requirement)' : 'var(--primary)', labelColor: x.bal < 0 ? 'var(--destructive)' : 'var(--tertiary)' })),
-      lines: [{ k:'Starting balance · Oct 1', v:m(18400) }, { k:'Current monthly deposit', v:m(dep) }, { k:'Annual disbursements', v:m(47800) },
-        { k:'Projected low point · Jun', v:m(low) }, { k:'Required cushion', v:m(cushion) }, { k:'Shortage spread · 12 mo', v:m(perMo) + ' / mo' }],
-      disb: [{ k:'Dec 1 · Shelby County tax', v:m(16800) }, { k:'Mar 15 · Hazard insurance', v:m(14200) }, { k:'Jun 1 · Shelby County tax', v:m(16800) }] };
+      lines: [{ k:'Starting balance · Oct 1', v:m(bal0) }, { k:'Current monthly deposit', v:m(dep) }, { k:'Annual disbursements', v:m(EA ? annual : 47800) },
+        { k:'Projected low point · Jun', v:m(low) }, { k:'Required cushion', v:m(cushion) }, { k:'Shortage spread · 12 mo', v:m(Math.max(perMo, 0)) + ' / mo' }],
+      disb: EA ? this.escDisb(EA).map(([k, v]) => ({ k, v:m(v) })) : [{ k:'Dec 1 · Shelby County tax', v:m(16800) }, { k:'Mar 15 · Hazard insurance', v:m(14200) }, { k:'Jun 1 · Shelby County tax', v:m(16800) }] };
 
     // Collections
-    const COL = [
+    const COL = DB ? DB.COL : [
       ['BPL-104395','Redline Homes LLC',116,'$9,146.72','90+ DPD','destructive','Sep 19','J. Park','JP','Notice of default review',[['Sep 19','Call','Guarantor said refinance falls through; asked for a 30-day hold.'],['Sep 2','Letter','60-day delinquency letter sent.'],['Aug 14','Call','No answer. Voicemail left.']]],
       ['BPL-104011','Northgate Flip Co.',86,'$8,437.50','60–89 DPD','destructive','Sep 19','M. Ortiz','MO','Promise to pay due today',[['Sep 19','Promise to pay','Borrower promised $8,437.50 by Sep 25.'],['Sep 5','Call','Contractor dispute delayed resale.']]],
       ['BPL-102190','Oakmont Retail Partners',55,'$58,020.14','30–59 DPD','warning','Sep 22','J. Park','JP','Hardship letter received',[['Sep 22','Email','Anchor tenant vacated; hardship letter and rent roll received.'],['Sep 9','Call','Short payment of $42,000 discussed.']]],
@@ -2133,10 +2455,11 @@ class Component extends DCLogic {
       ['BPL-100902','Summit Ridge Plaza',0,'$0.00','Workout','secondary','Sep 10','R. Chen','RC','Forbearance · month 2 of 6',[['Sep 10','Agreement','Forbearance month 2 payment received.']]]
     ];
     const dpdColor = d => d >= 60 ? 'var(--destructive)' : d >= 30 ? 'var(--requirement)' : 'var(--tertiary)';
-    const colRows = COL.map((c, i) => ({ id:c[0], borrower:c[1], openB:this.relClick(c[1]), expF:this.short(this.lossBase(c[0]).total), frozenSub: S.approvals[c[0]] ? 'Frozen ' + this.short(S.approvals[c[0]].baseline) + ' · ' + S.approvals[c[0]].date.replace(', 2026', '') : 'Baseline not frozen', dpd:c[2], due:c[3], stage:c[4], bv:c[5], last:c[6], who:c[7], dpdColor:dpdColor(c[2]),
+    const dueF = x => typeof x === 'number' ? m(x) : x;
+    const colRows = COL.map((c, i) => ({ id:c[0], borrower:c[1], openB:this.relClick(c[1]), expF:this.short(this.lossBase(c[0]).total), frozenSub: S.approvals[c[0]] ? 'Frozen ' + this.short(S.approvals[c[0]].baseline) + ' · ' + S.approvals[c[0]].date.replace(', 2026', '') : 'Baseline not frozen', dpd:c[2], due:dueF(c[3]), stage:c[4], bv:c[5], last:c[6], who:c[7], dpdColor:dpdColor(c[2]),
       bg: S.coll === i ? 'var(--primary-light)' : 'transparent', select: () => this.setState({ coll:i }) }));
-    const cs = COL[S.coll];
-    const colSel = { id:cs[0], borrower:cs[1], openB:this.relClick(cs[1]), dpd:cs[2], due:cs[3], log: cs[10].map(([when, type, text]) => ({ when, type, text })) };
+    const cs = COL[S.coll] || COL[0];
+    const colSel = { id:cs[0], borrower:cs[1], openB:this.relClick(cs[1]), dpd:cs[2], due:dueF(cs[3]), log: cs[10].map(([when, type, text]) => ({ when, type, text })) };
     const lb = this.lossBase(cs[0]), ap = S.approvals[cs[0]], LB = this.lib(cs[0]);
     const ranked = LB.rows.filter(r => !r.reason).sort((x, y) => y.r.prev - x.r.prev), naRows = LB.rows.filter(r => r.reason);
     const scenRow = ranked.find(r => r.key === S.scen) || ranked[0];
@@ -2204,40 +2527,46 @@ class Component extends DCLogic {
           showPc: () => this.setState({ libSel:'Project Completion' }) });
       } else { cvl.calc = false; }
     }
-    const libLoans = COL.map((c, i) => ({ id:c[0], state: S.coll === i ? 'active' : '', go: () => this.setState({ coll:i, libSel:null }) }));
+    const libIdx = DB ? COL.map((c, i) => i).filter(i => DB.ANALYSIS[COL[i][0]]).slice(0, 12) : COL.map((c, i) => i);
+    if (!libIdx.includes(S.coll) && COL[S.coll]) libIdx.unshift(S.coll);
+    const libLoans = libIdx.map(i => ({ id:COL[i][0], state: S.coll === i ? 'active' : '', go: () => this.setState({ coll:i, libSel:null }) }));
     const libVals = { cvl, libRows, libNA, hasNA: libNA.length > 0, libSel, libH, libLoans, openLib: () => this.go('strategy') };
-    const STG = [['1–29 DPD','var(--requirement)'],['30–59 DPD','var(--requirement)'],['60–89 DPD','var(--destructive-light)'],['90+ DPD','var(--destructive)'],['Notice of Default','var(--tertiary)'],['Workout','var(--secondary)']];
-    const counts = { '1–29 DPD':[41,'$18.2M'], '30–59 DPD':[56,'$40.4M'], '60–89 DPD':[23,'$20.2M'], '90+ DPD':[13,'$12.3M'], 'Notice of Default':[6,'$9.1M'], 'Workout':[9,'$14.8M'] };
+    const STG = DB ? [['1–29 DPD','var(--requirement)'],['30–59 DPD','var(--requirement)'],['60–89 DPD','var(--destructive-light)'],['90+ DPD','var(--destructive)'],['Matured Unpaid','var(--secondary)'],['Foreclosure','var(--tertiary)']]
+      : [['1–29 DPD','var(--requirement)'],['30–59 DPD','var(--requirement)'],['60–89 DPD','var(--destructive-light)'],['90+ DPD','var(--destructive)'],['Notice of Default','var(--tertiary)'],['Workout','var(--secondary)']];
+    const counts = DB ? Object.fromEntries(STG.map(([k]) => { const cs2 = COL.filter(c => c[4] === k); return [k, [cs2.length, this.short(cs2.reduce((t, c) => t + ((DB.byId[c[0]] || {}).upb || 0), 0))]]; }))
+      : { '1–29 DPD':[41,'$18.2M'], '30–59 DPD':[56,'$40.4M'], '60–89 DPD':[23,'$20.2M'], '90+ DPD':[13,'$12.3M'], 'Notice of Default':[6,'$9.1M'], 'Workout':[9,'$14.8M'] };
     const board = STG.map(([label, color]) => ({ label, color, count: counts[label][0], upb: counts[label][1] + ' UPB',
-      cards: COL.map((c, i) => [c, i]).filter(([c]) => c[4] === label).map(([c, i]) => ({ id:c[0], borrower:c[1], openB:this.relClick(c[1]), expF:this.short(this.lossBase(c[0]).total), dpd:c[2], due:c[3], next:c[9], whoI:c[8], dpdColor:dpdColor(c[2]),
+      cards: COL.map((c, i) => [c, i]).filter(([c]) => c[4] === label).slice(0, 12).map(([c, i]) => ({ id:c[0], borrower:c[1], openB:this.relClick(c[1]), expF:this.short(this.lossBase(c[0]).total), dpd:c[2], due:dueF(c[3]), next:c[9], whoI:c[8], dpdColor:dpdColor(c[2]),
         select: () => this.setState({ coll:i, v:{ ...this.state.v, collections:'A' } }) })) }));
 
     // Maturity
-    const matSummary = [{ label:'Payoff / refi confirmed', n:72, color:'var(--primary)' }, { label:'Extension in process', n:42, color:'var(--secondary)' }, { label:'No resolution', n:47, color:'var(--muted)' }, { label:'Matured, unpaid', n:6, color:'var(--destructive)' }];
-    const RB = { 'Payoff expected':'success', 'Extension':'secondary', 'No response':'outline', 'Matured':'destructive', 'Refi in process':'default' };
-    const lad = [
+    const matSummary = DB ? DB.MAT_SUM.map(([label, n, color]) => ({ label, n, color })) : [{ label:'Payoff / refi confirmed', n:72, color:'var(--primary)' }, { label:'Extension in process', n:42, color:'var(--secondary)' }, { label:'No resolution', n:47, color:'var(--muted)' }, { label:'Matured, unpaid', n:6, color:'var(--destructive)' }];
+    const RB = { 'Payoff expected':'success', 'Extension':'secondary', 'No response':'outline', 'Matured':'destructive', 'Refi in process':'default', 'Extension approved':'success', 'Extension declined':'destructive', 'Notice sent':'outline' };
+    const lad = DB ? DB.LADDER.map(([mo, n, ls]) => [mo, n, ls.slice(0, 6).map(x => [x[0], x[1], x[2], x[3], this.short(x[4]), x[5]])]) : [
       ['October 2026', 48, [['BPL-101002','Linwood Partners LLC','Bridge','Oct 1','$2.10M','Payoff expected'],['BPL-104220','Crane Street Homes','Fix & Flip','Oct 15','$385K','No response'],['BPL-103771','Monroe Ave Flip LLC','Fix & Flip','Oct 31','$512K','Extension'],['BPL-100744','Kessler Development','Bridge','Sep 1','$3.30M','Matured']]],
       ['November 2026', 52, [['BPL-104827','Crestline Holdings LLC','Bridge','Nov 30','$1.24M','Extension'],['BPL-102455','Eastgate Storage LLC','CRE','Nov 1','$5.80M','Refi in process'],['BPL-104301','Sutter Row Homes','Fix & Flip','Nov 15','$440K','Payoff expected']]],
       ['December 2026', 61, [['BPL-104395','Redline Homes LLC','Fix & Flip','Dec 31','$298K','No response'],['BPL-102980','Ridgeview Apartments','Bridge','Dec 1','$4.75M','Refi in process'],['BPL-103612','Pier 9 Holdings','Bridge','Dec 15','$1.62M','Payoff expected']]]
     ];
     const ladder = lad.map(([month, count, ls]) => ({ month, count, summary: count + ' loans', loans: ls.map(([id, borrower, type, date, upb, res]) => ({ id, borrower, type, date, upb, res, bv: RB[res], openB:this.relClick(borrower),
-      open: () => id === 'BPL-104827' ? this.go('maturity', { v:{ ...this.state.v, maturity:'B' }, step:1 }) : (this.LOANS.find(l => l.id === id) && this.openLoan(id)) })) }));
+      open: () => DB ? (DB.EXT_BY_LOAN[id] ? this.openExt(id) : this.openLoan(id)) : id === 'BPL-104827' ? this.go('maturity', { v:{ ...this.state.v, maturity:'B' }, step:1 }) : (this.LOANS.find(l => l.id === id) && this.openLoan(id)) })) }));
     const SN = ['Request','Eligibility','Terms','Approval','Documents'];
     const steps = SN.map((label, i) => { const n = i + 1, done = n < S.step, a = n === S.step;
       return { n: done ? '✓' : n, label, fw: a ? 600 : 400, bar: done || a ? 'var(--primary)' : 'var(--border)', dotBg: done ? 'var(--primary)' : a ? 'var(--tertiary)' : 'var(--muted-lightest)', dotFg: done || a ? '#fff' : 'var(--muted-dark)', go: () => this.setState({ step:n }) }; });
     const st = { s1:S.step === 1, s2:S.step === 2, s3:S.step === 3, s4:S.step === 4, s5:S.step === 5 };
     const pass = { icon:'check-circle', color:'var(--success)' }, warn = { icon:'warning-circle', color:'var(--requirement)' };
-    const elig = [
+    const extV = DB ? this.extDb(pass, warn) : null;
+    const elig = extV ? extV.elig : [
       { ...pass, k:'No monetary default', req:'Current on all payments', v:'Current' },
       { ...pass, k:'Payment history', req:'No 30+ DPD in trailing 6 months', v:'0 lates' },
       { ...pass, k:'Loan-to-value', req:'≤ 75% on updated as-is value', v:'59% (BPO $2.10M)' },
       { ...pass, k:'Project completion', req:'Rehab 100% complete or on budget', v:'Completed Aug 28' },
       { ...warn, k:'Insurance', req:'Coverage through extended maturity', v:'Expires Aug 15, 2027' }
     ];
-    const extTerms = [{ k:'Maturity', a:'Nov 30, 2026', b:'May 31, 2027' }, { k:'Note rate', a:'11.25%', b:'11.75%' }, { k:'Monthly interest', a:'$11,625.00', b:'$12,141.67' }, { k:'Extension fee', a:'—', b:'1.00% · $12,400.00' }, { k:'Interest reserve', a:'$37,200.00', b:'Replenish to 3 months' }];
-    const approvals = [{ i:'RC', role:'Asset Manager', who:'R. Chen · Sep 23', status:'Approved', bv:'success' }, { i:'LW', role:'Credit', who:'L. Whitaker · Sep 24', status:'Approved', bv:'success' }, { i:'HP', role:'Investor Consent', who:'Harbor Point Capital · sent Sep 24', status:'Pending', bv:'warning' }, { i:'MO', role:'Servicing', who:'M. Ortiz', status:'Waiting', bv:'outline' }];
-    const extDocs0 = [{ k:'Loan Modification & Extension Agreement', sub:'Generated Sep 25 · 6 pages', status:'Ready', bv:'success' }, { k:'Guarantor Reaffirmation', sub:'Daniel Reyes', status:'Ready', bv:'success' }, { k:'Borrower Notice of Terms', sub:'Email + portal', status:'Draft', bv:'outline' }];
-    const extDocs = extDocs0.map(d => d.sub === 'Daniel Reyes' ? { ...d, click:this.relClick('Daniel Reyes'), cursor:'pointer', deco:'underline dotted' } : { ...d, cursor:'default', deco:'none' });
+    const extTerms = extV ? extV.terms : [{ k:'Maturity', a:'Nov 30, 2026', b:'May 31, 2027' }, { k:'Note rate', a:'11.25%', b:'11.75%' }, { k:'Monthly interest', a:'$11,625.00', b:'$12,141.67' }, { k:'Extension fee', a:'—', b:'1.00% · $12,400.00' }, { k:'Interest reserve', a:'$37,200.00', b:'Replenish to 3 months' }];
+    const approvals = extV ? extV.approvals : [{ i:'RC', role:'Asset Manager', who:'R. Chen · Sep 23', status:'Approved', bv:'success' }, { i:'LW', role:'Credit', who:'L. Whitaker · Sep 24', status:'Approved', bv:'success' }, { i:'HP', role:'Investor Consent', who:'Harbor Point Capital · sent Sep 24', status:'Pending', bv:'warning' }, { i:'MO', role:'Servicing', who:'M. Ortiz', status:'Waiting', bv:'outline' }];
+    const extDocs0 = extV ? extV.docs : [{ k:'Loan Modification & Extension Agreement', sub:'Generated Sep 25 · 6 pages', status:'Ready', bv:'success' }, { k:'Guarantor Reaffirmation', sub:'Daniel Reyes', status:'Ready', bv:'success' }, { k:'Borrower Notice of Terms', sub:'Email + portal', status:'Draft', bv:'outline' }];
+    const extG = extV ? extV.ext.guarantor : 'Daniel Reyes';
+    const extDocs = extDocs0.map(d => d.sub === extG ? { ...d, click:this.relClick(extG), cursor:'pointer', deco:'underline dotted' } : { ...d, cursor:'default', deco:'none' });
     const stepCta = S.step === 5 ? 'Send for Signature' : S.step === 4 ? 'Continue to Documents' : 'Continue';
 
     const relObj = this.relFor(S.relName), rel = this.relView(relObj, S);
@@ -2251,9 +2580,14 @@ class Component extends DCLogic {
       ['Coastal Credit Fund II','Whole loans · 25 bps servicing',322,'$142.9M',2110500,1402677,29771,'Reconciled','success','Wire Oct 15 · Wells ····7783'],
       ['Balance Sheet','Retained · no fee',154,'$56.4M',812300,498115,0,'Reconciled','success','Internal transfer Oct 15']
     ];
-    const remit = R.map(([name, sub, loans, upb, p, i, fee, rec, bv, wire]) => ({ name, sub, loans: loans.toLocaleString(), upb, p:m(p, 0), i:m(i, 0), fee:m(fee, 0), feeNeg: fee ? m(-fee, 0) : '$0',
+    const remit = DB ? DB.REMIT.map(r => ({ name:r.name, sub:r.sub, loans:r.loans.toLocaleString(), upb:this.big(r.upb), p:m(r.p, 0), i:m(r.i, 0), fee:m(r.fee, 0), feeNeg: r.fee ? m(-r.fee, 0) : '$0',
+      net:m(r.p + r.i - r.fee, 0), rec:r.rec, bv:r.bv, wire:r.wire, pW:(r.p / Math.max(r.p + r.i, 1) * 100) + '%', iW:(r.i / Math.max(r.p + r.i, 1) * 100) + '%' })) : R.map(([name, sub, loans, upb, p, i, fee, rec, bv, wire]) => ({ name, sub, loans: loans.toLocaleString(), upb, p:m(p, 0), i:m(i, 0), fee:m(fee, 0), feeNeg: fee ? m(-fee, 0) : '$0',
       net:m(p + i - fee, 0), rec, bv, wire, pW:(p / (p + i) * 100) + '%', iW:(i / (p + i) * 100) + '%' }));
 
+    const RT = DB ? DB.REMIT.reduce((t, r) => ({ loans:t.loans + r.loans, upb:t.upb + r.upb, p:t.p + r.p, i:t.i + r.i, fee:t.fee + r.fee }), { loans:0, upb:0, p:0, i:0, fee:0 }) : null;
+    const remitTot = RT ? { loans:RT.loans.toLocaleString(), upb:this.big(RT.upb), p:m(RT.p, 0), i:m(RT.i, 0), fee:m(RT.fee, 0), net:m(RT.p + RT.i - RT.fee, 0) }
+      : { loans:'2,334', upb:'$1,180.2M', p:'$13,936,358', i:'$9,716,907', fee:'$234,126', net:'$23,419,139' };
+    const remitVar = DB ? DB.REMIT.flatMap(r => r.ex.map(([id, item, amt, st]) => ({ id, item, amt:m(amt), inv:r.name, st }))) : [{ id:'BPL-101876', item:'Late fee collected Sep 29, posted Oct 1', amt:'$1,204.00', inv:'Meridian Life', st:'J. Park' }];
     const num = x => typeof x === 'number' ? x : parseFloat(String(x).replace(/[^0-9.\-]/g, '')) || 0;
     const mUnit = x => { const t = String(x), n = num(t); return /M/.test(t) ? n * 1e6 : /K/.test(t) ? n * 1e3 : n; };
     const TIER_OF = { 'Current':'Pass', '30 DPD':'Watch', '60 DPD':'Special Mention', '90+ DPD':'Substandard', 'Forbearance':'Special Mention', 'Matured':'Watch' };
@@ -2261,11 +2595,13 @@ class Component extends DCLogic {
     const progOf = t => t === 'DSCR' ? 'DSCR' : t === 'CRE' ? 'CRE' : 'RTL';
     const seenQ = {}, loanQ = [];
     const addL = o => { if (seenQ[o.loan]) return; seenQ[o.loan] = 1; const b2 = this.lossBase(o.loan); o.exposure = b2 ? b2.total : null; loanQ.push(o); };
-    this.RELS.forEach(r => r.loans.forEach(l => { const t = this.toLoan(l, r); addL({ loan:l.id, borrower:l.entity, guarantor:r.guarantors[0].name, program:l.prog, type:l.type, state:l.state, upb:l.upb, rate:t.rate, status:l.status, investor:t.investor, maturity:l.maturity, tier: l.changes.length ? l.changes[l.changes.length - 1][3] : l.tier0, dscr: l.dscr ? parseFloat(l.dscr) : null }); }));
-    this.LOANS.forEach(l => addL({ loan:l.id, borrower:l.borrower, guarantor:l.guarantor, program:progOf(l.type), type:l.type, state:stOf(l.property), upb:l.upb, rate:l.rate, status:l.status, investor:l.investor, maturity:l.maturity, tier:TIER_OF[l.status] || 'Pass', dscr: l.dscr ? parseFloat(l.dscr) : null }));
+    if (!DB) this.RELS.forEach(r => r.loans.forEach(l => { const t = this.toLoan(l, r); addL({ loan:l.id, borrower:l.entity, guarantor:r.guarantors[0].name, program:l.prog, type:l.type, state:l.state, upb:l.upb, rate:t.rate, status:l.status, investor:t.investor, maturity:l.maturity, tier: l.changes.length ? l.changes[l.changes.length - 1][3] : l.tier0, dscr: l.dscr ? parseFloat(l.dscr) : null }); }));
+    this.LOANS.forEach(l => { const th = DB && DB.TIER[l.id];
+      addL({ loan:l.id, borrower:l.borrower, guarantor:l.guarantor, program: DB ? (l.prog === 'MF' ? 'Multifamily' : l.prog) : progOf(l.type), type:l.type, state: l.state || stOf(l.property), upb:l.upb, rate:l.rate, status:l.status, investor:l.investor, maturity:l.maturity,
+        tier: th ? (th.changes.length ? th.changes[th.changes.length - 1][3] : th.tier0) : TIER_OF[l.status] || 'Pass', dscr: l.dscr ? parseFloat(l.dscr) : null }); });
     Object.entries(this.FACTS).forEach(([id, f]) => { const x = this.LOSS_IN[id]; addL({ loan:id, borrower:f.borrower, guarantor:f.guarantor, program:f.prog, type:f.ptype, state:f.st, upb:x[0], rate:x[1], status: !f.dpd ? 'Forbearance' : f.dpd >= 90 ? '90+ DPD' : f.dpd >= 60 ? '60 DPD' : f.dpd >= 30 ? '30 DPD' : '1–29 DPD', investor:'Harbor Point Capital', maturity:'—', tier: f.dpd >= 90 ? 'Substandard' : 'Watch', dscr:null }); });
     const FD = (k, label, t, fmt) => ({ k, label, t, fmt });
-    const hLoans = [...this.LOANS.filter(l => l.type === 'DSCR'), ...this.RELS.flatMap(r => r.loans.filter(l => l.prog === 'DSCR').map(l => this.toLoan(l, r)))];
+    const hLoans = DB ? this.LOANS.filter(l => DB.HEALTH[l.id]) : [...this.LOANS.filter(l => l.type === 'DSCR'), ...this.RELS.flatMap(r => r.loans.filter(l => l.prog === 'DSCR').map(l => this.toLoan(l, r)))];
     const DS = {
       loans:{ label:'Loans', icon:'buildings', desc:'Every serviced loan: terms, status, tier and loss exposure', def:['loan','borrower','program','state','upb','status','tier'], rows:loanQ,
         fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('guarantor','Guarantor','text'),FD('program','Program','enum'),FD('type','Type','enum'),FD('state','State','enum'),FD('upb','UPB','num','$'),FD('rate','Rate','num','%'),FD('status','Status','enum'),FD('investor','Investor','enum'),FD('maturity','Maturity','text'),FD('tier','Covenant Tier','enum'),FD('dscr','DSCR','num','x'),FD('exposure','Loss Exposure','num','$')] },
@@ -2282,13 +2618,13 @@ class Component extends DCLogic {
         rows:escRows.map(r => ({ loan:r.id, borrower:r.borrower, tax:num(r.tax), ins:num(r.ins), ir: r.ir === '—' ? null : num(r.ir), rr: r.rr === '—' ? null : num(r.rr), next:r.next, nextAmt:num(r.nextAmt), status:r.status })),
         fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('tax','Tax Escrow','num','$'),FD('ins','Insurance Escrow','num','$'),FD('ir','Interest Reserve','num','$'),FD('rr','Replacement / TI-LC','num','$'),FD('next','Next Disbursement','text'),FD('nextAmt','Next Amount','num','$'),FD('status','Status','enum')] },
       remittance:{ label:'Investor Remittance', icon:'bank', desc:'September 2026 collection period by investor', def:['investor','loans','upb','principal','interest','fee','net','rec'],
-        rows:R.map(r => ({ investor:r[0], loans:r[2], upb:mUnit(r[3]), principal:r[4], interest:r[5], fee:r[6], net:r[4] + r[5] - r[6], rec:r[7] })),
+        rows: DB ? DB.REMIT.map(r => ({ investor:r.name, loans:r.loans, upb:r.upb, principal:r.p, interest:r.i, fee:r.fee, net:r.p + r.i - r.fee, rec:r.rec })) : R.map(r => ({ investor:r[0], loans:r[2], upb:mUnit(r[3]), principal:r[4], interest:r[5], fee:r[6], net:r[4] + r[5] - r[6], rec:r[7] })),
         fields:[FD('investor','Investor','enum'),FD('loans','Loans','num','int'),FD('upb','Ending UPB','num','$'),FD('principal','Principal','num','$'),FD('interest','Interest','num','$'),FD('fee','Servicing Fee','num','$'),FD('net','Net Remittance','num','$'),FD('rec','Reconciliation','enum')] },
       draws:{ label:'RTL Draws', icon:'hammer', desc:'Construction draws funded on RTL loans', def:['loan','borrower','draw','date','amount','pct','remaining'],
-        rows:Object.entries(this.PROJ).flatMap(([id, pj]) => pj.draws.map(([d, a, p], i) => ({ loan:id, borrower:this.FACTS[id].borrower, draw:i + 1, date:d, amount:a, pct:p, budget:pj.budget, remaining:pj.budget - pj.draws.slice(0, i + 1).reduce((t, x) => t + x[1], 0) }))),
+        rows:Object.entries(this.PROJ).flatMap(([id, pj]) => pj.draws.map(([d, a, p], i) => ({ loan:id, borrower: DB ? DB.byId[id].borrower : this.FACTS[id].borrower, draw:i + 1, date:d, amount:a, pct:p, budget:pj.budget, remaining:pj.budget - pj.draws.slice(0, i + 1).reduce((t, x) => t + x[1], 0) }))),
         fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('draw','Draw #','num','int'),FD('date','Date','text'),FD('amount','Amount','num','$'),FD('pct','% Complete at Draw','num','int'),FD('budget','Budget','num','$'),FD('remaining','Holdback Remaining','num','$')] },
       health:{ label:'Property Health', icon:'heartbeat', desc:'DSCR loans with latest DSCR, occupancy and early-warning flags', def:['loan','borrower','dscr','occ','status','flags','summary'],
-        rows:hLoans.map(l => { const H = this.healthCalc(l); return { loan:l.id, borrower:l.borrower, dscr:H.d[5], prior:H.d[4], occ:H.occP[5], status: H.breached ? 'Covenant breached' : H.flags.length ? 'Early warning' : 'Healthy', flags:H.flags.length, summary:H.flags.map(f => f.title).join('; ') || '—' }; }),
+        rows:hLoans.filter(l => this.healthCalc(l)).map(l => { const H = this.healthCalc(l); return { loan:l.id, borrower:l.borrower, dscr:H.d[5], prior:H.d[4], occ:H.occP[5], status: H.breached ? 'Covenant breached' : H.flags.length ? 'Early warning' : 'Healthy', flags:H.flags.length, summary:H.flags.map(f => f.title).join('; ') || '—' }; }),
         fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('dscr','DSCR','num','x'),FD('prior','Prior DSCR','num','x'),FD('occ','Occupancy %','num','int'),FD('status','Health Status','enum'),FD('flags','Flags','num','int'),FD('summary','Flag Summary','text')] },
       db_loans:{ live:true, label:'Servicing DB · Loans', icon:'database', desc:'Live query against the servicing database (lima-cap Postgres, running in your browser)', def:['loan','borrower','product','state','upb','status','dpd'], rows:[],
         fields:[FD('loan','Loan','text'),FD('borrower','Borrower','text'),FD('borrower_type','Borrower Type','enum'),FD('guarantor','Guarantor','text'),FD('program','Program','enum'),FD('product','Product','enum'),FD('city','City','text'),FD('state','State','enum'),FD('property_type','Property Type','enum'),FD('note_amount','Note Amount','num','$'),FD('upb','UPB','num','$'),FD('rate','Rate','num','%'),FD('dpd','Days Past Due','num','int'),FD('status','Status','enum'),FD('investor','Investor','enum'),FD('maturity','Maturity','text'),FD('watchlist','Watchlist','enum'),FD('open_signals','Open Risk Signals','num','int')] },
@@ -2406,7 +2742,7 @@ class Component extends DCLogic {
       qDirs:[['asc','Asc'],['desc','Desc']].map(([k, label]) => ({ label, state: q.dir === k ? 'active' : '', go: () => setQ({ dir:k }) })),
       qText, qHdr, qRows:qOut, qTotals:qTot || [], qHasTotals:!!qTot, qEmpty: nMatch === 0,
       qCount: grouped ? qOut.length + ' groups from ' + nMatch + ' of ' + D.rows.length + ' rows' : nMatch + ' of ' + D.rows.length + ' rows' + (nMatch > 50 ? ' · showing first 50' : ''),
-      qLive:false, sqlText:'', sqlHdr:[], sqlRows:[], sqlHasRows:false, sqlMsg:'', sqlMsgColor:'', ...live,
+      qLive:false, sqlText:'', sqlHdr:[], sqlRows:[], sqlHasRows:false, sqlMsg:'', sqlMsgColor:'', sqlSet: () => {}, sqlRunGo: () => {}, sqlReset: () => {}, ...live,
       qName:S.qName, qSetName: e => this.setState({ qName:e.target.value }),
       qSave: () => { const name = S.qName.trim() || D.label + ' query'; this.setState(st => ({ saved:[...st.saved.filter(x => x.name !== name), { name, user:true, q:{ ...st.q } }], qName:name })); this.toast('Report saved', name); },
       qCopy: () => { const tsv = [qRawHdr, ...qRaw].map(r => r.join('\t')).join('\n'); try { navigator.clipboard.writeText(tsv); } catch (e) {} this.toast('Copied to clipboard', qRaw.length + ' rows, tab-separated'); },
@@ -2414,27 +2750,38 @@ class Component extends DCLogic {
         a.href = URL.createObjectURL(blob); a.download = (fileBase || 'report') + '.csv'; document.body.appendChild(a); a.click(); a.remove(); this.toast('Export ready', qRaw.length + ' rows · ' + a.download); }
     };
     return {
+      dbLoading: !S.hydrated && (S.dbStatus === 'loading' || S.dbStatus === 'ready') && !S.hydrateError,
+      dbFailed: !S.hydrated && (S.dbStatus === 'error' || S.dbStatus === 'missing' || !!S.hydrateError),
+      dbFailedText: 'The servicing database did not load (' + (S.hydrateError || (window.LimaDB && window.LimaDB.error && window.LimaDB.error.message) || S.dbStatus) + '). Serve the folder over HTTP to use live data.',
+      search: S.search, setSearch: e => this.setState({ search:e.target.value, screen:'dashboard', v:{ ...this.state.v, dashboard:'A' } }), loanPageLabel, asofS: DB ? DB.asofS : 'Sep 25',
+      exportLoans: () => this.exportLoans(loanMatch), wallLegend: DB ? 'Extension approved' : 'Payoff / refi confirmed', payMethods,
+      batchLabel: DB ? DB.BATCH.label : 'Lockbox + ACH · Batch 0925-A', batchSub: DB ? DB.BATCH.sub : 'Received 6:02 AM · Cutoff 4:00 PM ET',
+      escHdr: DB ? ['Escrow Balance','Monthly Escrow','UPB','Open Signal'] : ['Tax','Insurance','Interest Reserve','Replacement / TI-LC'],
+      ext: extV ? extV.ext : { id:'BPL-104827', maturity:'Nov 30, 2026', status:'Under review', statusBv:'secondary', borrower:'Crestline Holdings LLC', openB:this.relClick('Crestline Holdings LLC'), guarantor:'Daniel Reyes', openG:this.relClick('Daniel Reyes'), investor:'Harbor Point Capital',
+        received:'Sep 18, 2026 · borrower portal', term:'6 months (option 1 of 2)', conditions:'Sale · listed Sep 10', narrative:'Rehab completed Aug 28. Units 1–3 listed for sale; two offers under review. Requesting first extension to close the sale.', consentNote:'Whole-loan investor consent required per servicing agreement §4.2.' },
+      extPick: extV ? extV.pick : [], extHasPick: !!(extV && extV.pick.length > 1),
+      remitTot, remitVar, remitVarTitle: DB ? 'Open Payment Exceptions · by Investor' : 'Open Variance · Meridian Life', remitVarDesc: DB ? (remitVar.length ? remitVar.length + ' open items to clear before the period locks' : 'No open exceptions this period') : 'Custodial account vs. servicing system',
       ...qVals, inboxSummary, ...lossExtras, ...libVals, colLoss, approveScenario, rel, relPicker, tierLegend, relClearEntity: () => this.setState({ relEntity:null }), openCrestline:this.relClick('Crestline Holdings LLC'), openReyes:this.relClick('Daniel Reyes'), openSandoval:this.relClick('Sandoval Rentals LLC'),
       navW, navOpen: !S.navCollapsed, navClosed: S.navCollapsed, toggleNav: () => this.setState(s => ({ navCollapsed: !s.navCollapsed })),
       nav, showVariants: this.VARIANTS[S.screen].length > 1, title: cur.title, crumb: cur.crumb, variants, is,
       kpis, buckets, trend, typeTabs, loanRows, loanCountLabel, taskGroups, taskSel, taskItems, heatCols, heatRows, wall,
       loan: L, loanTabs, tab, checks, podTabs, payoff,
-      goPost: () => this.go('payments', { v:{ ...V, payments:'A' } }),
+      goPost: () => this.go('payments', { v:{ ...V, payments:'A' }, ...(DB ? { amt:null } : {}) }),
       goPayoff: () => this.setState({ v:{ ...V, loan:'B' } }),
-      goExtension: () => this.go('maturity', { v:{ ...V, maturity:'B' }, step:1 }),
+      goExtension: () => DB && DB.EXT_BY_LOAN[L.id] ? this.openExt(L.id) : this.go('maturity', { v:{ ...V, maturity:'B' }, step:1 }),
       issuePayoff: () => this.toast('Payoff letter issued', L.id + ' · good through Oct ' + S.pod + ', 2026'),
-      amt: S.amt, setAmt: e => this.setState({ amt: e.target.value }), post, posted, postedSummary,
-      postPayment: () => { if (!amtN) return; this.setState(s => ({ extraPosted: [{ time:'Now', id:'BPL-104827', borrower:'Crestline Holdings LLC', openB:this.relClick('Crestline Holdings LLC'), method:'Wire', amt:m(amtN), applied: short ? 'Suspense' : 'Interest, escrow' + (amtN > PD ? ', principal' : ''), by:'M. Ortiz', bg:'var(--primary-light)', n:amtN }, ...s.extraPosted] })); this.toast('Payment posted', 'BPL-104827 · ' + m(amtN) + (short ? ' held in suspense' : ' applied')); },
+      amt: amtS, setAmt: e => this.setState({ amt: e.target.value }), post, posted, postedSummary,
+      postPayment: () => { if (!amtN) return; if (DB) { this.setState({ amt:null }); return this.postPaymentDb(L, amtN, short); } this.setState(s => ({ extraPosted: [{ time:'Now', id:'BPL-104827', borrower:'Crestline Holdings LLC', openB:this.relClick('Crestline Holdings LLC'), method:'Wire', amt:m(amtN), applied: short ? 'Suspense' : 'Interest, escrow' + (amtN > PD ? ', principal' : ''), by:'M. Ortiz', bg:'var(--primary-light)', n:amtN }, ...s.extraPosted] })); this.toast('Payment posted', 'BPL-104827 · ' + m(amtN) + (short ? ' held in suspense' : ' applied')); },
       exceptions, exDone: exceptions.length === 0, batch,
-      escKpis, escRows, esc, sendEscrow: () => this.toast('Escrow analysis approved', 'Statement queued to Sandoval Rentals LLC. New payment effective Nov 1.'),
+      escKpis, escRows, esc, sendEscrow: () => this.toast('Escrow analysis approved', 'Statement queued to ' + esc.borrower + '. New payment effective Nov 1.'),
       colRows, colSel, board,
-      logCall: () => this.toast('Call logged', colSel.id + ' · contact history updated'),
-      logPtp: () => this.toast('Promise to pay recorded', colSel.id + ' · follow-up task created'),
+      logCall: () => DB ? this.logContact(cs, false) : this.toast('Call logged', colSel.id + ' · contact history updated'),
+      logPtp: () => DB ? this.logContact(cs, true) : this.toast('Promise to pay recorded', colSel.id + ' · follow-up task created'),
       sendNod: () => this.toast('Notice of default drafted', colSel.id + ' · routed for legal review'),
       matSummary, ladder, steps, st, elig, extTerms, approvals, extDocs, stepCta,
       stepBack: () => this.setState(s => ({ step: Math.max(1, s.step - 1) })),
-      stepNext: () => S.step === 5 ? this.toast('Sent for signature', 'Extension agreement sent to Crestline Holdings LLC and guarantor.') : this.setState(s => ({ step: s.step + 1 })),
-      remit, lockRemit: () => this.toast('Period locked', 'Sep 2026 remittance locked. 1 open variance carried forward.'),
+      stepNext: () => S.step === 5 ? (extV ? this.approveExt(extV.ext) : this.toast('Sent for signature', 'Extension agreement sent to Crestline Holdings LLC and guarantor.')) : this.setState(s => ({ step: s.step + 1 })),
+      remit, lockRemit: () => this.toast('Period locked', 'Sep 2026 remittance locked. ' + (remitVar.length ? remitVar.length + ' open item' + (remitVar.length > 1 ? 's' : '') + ' carried forward.' : 'No open items.')),
       hasToast: !!S.toast, toast: S.toast || { title:'', desc:'' }
     };
   }
