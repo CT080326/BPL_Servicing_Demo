@@ -1,0 +1,183 @@
+/* =====================================================
+   Phoenix Burst — Colors & Typography
+   Source: phoenix-burst-ui / app/styles/globals.css + tailwind.config.ts
+   ===================================================== */
+
+/* ---------- Fonts ---------- */
+@font-face {
+  font-family: 'Sofia Pro';
+  font-weight: 100 300;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/SofiaProLight.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sofia Pro';
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  src: url('./fonts/SofiaProMedium.woff2') format('woff2');
+}
+
+:root {
+  /* ---------- Brand / Core palette ---------- */
+  --background:            hsla(217, 80%, 14%, 1);   /* Deep navy — app bg */
+  --foreground:            hsl(224, 71.4%, 4.1%);
+
+  --primary:               hsla(189, 100%, 42%, 1);  /* Phoenix cyan */
+  --primary-light:         hsla(189, 100%, 42%, 0.15);
+  --primary-dark:          rgb(0, 109, 129);
+  --primary-foreground:    hsl(210, 20%, 98%);
+
+  --secondary:             hsla(282, 49%, 39%, 1);   /* Phoenix purple */
+  --secondary-foreground:  hsl(0, 0%, 100%);
+  --secondary-dark:        hsla(258, 52%, 43%, 1);
+
+  --tertiary:              hsla(217, 80%, 14%, 1);   /* Deep navy */
+  --tertiary-light:        hsla(214, 32%, 91%, 1);
+  --tertiary-foreground:   hsl(210, 20%, 98%);
+
+  /* ---------- Neutrals / Muted scale ---------- */
+  --muted:                 rgb(139, 142, 147);
+  --muted-foreground:      hsl(210, 20%, 98%);
+  --muted-light:           hsla(0, 0%, 85%, 1);
+  --muted-lightest:        hsla(0, 0%, 95%, 1);
+  --muted-light-foreground:     hsl(210, 20%, 98%);
+  --muted-dark:            hsla(223, 3%, 40%, 1);
+  --muted-dark-foreground: hsl(210, 20%, 98%);
+  --muted-darkest:         hsla(45, 4%, 20%, 1);
+  --muted-darkest-foreground: hsl(210, 20%, 98%);
+
+  /* ---------- Semantic ---------- */
+  --accent:                hsl(226, 56%, 13%);
+  --accent-foreground:     hsl(210, 20%, 98%);
+
+  --success:               hsla(149, 56%, 30%, 1);
+  --success-foreground:    hsl(210, 20%, 98%);
+  --success-light:         rgb(78, 153, 114);
+  --success-light-foreground: hsl(210, 20%, 98%);
+
+  --destructive:           hsl(3, 74%, 35%);
+  --destructive-foreground: hsl(210, 20%, 98%);
+  --destructive-light:     hsla(12, 71%, 45%, 1);
+  --destructive-light-foreground: hsl(210, 20%, 98%);
+
+  --warning:               hsl(48, 100%, 50%);
+
+  /* ---------- Surfaces ---------- */
+  --card:                  hsl(240, 5%, 96%);
+  --card-foreground:       hsl(0, 0%, 0%);
+  --card-hover:            rgba(209, 219, 236, 1);
+  --popover:               hsl(0, 0%, 100%);
+  --popover-foreground:    hsl(0, 0%, 0%);
+
+  /* ---------- Domain tokens (artifact types) ---------- */
+  --requirement:           hsla(40, 98%, 43%, 1);    /* Amber */
+  --requirement-foreground: hsl(210, 20%, 98%);
+  --requirement-light:     hsla(40, 98%, 43%, 0.1);
+
+  --story:                 hsla(115, 75%, 34%, 1);   /* Green */
+  --story-foreground:      hsl(210, 20%, 98%);
+
+  --acceptance-criteria:   hsla(223, 77%, 38%, 1);   /* Blue */
+  --acceptance-criteria-foreground: hsl(210, 20%, 98%);
+
+  --test:                  hsla(331, 69%, 38%, 1);   /* Magenta */
+  --test-foreground:       hsl(210, 20%, 98%);
+
+  /* ---------- Utility ---------- */
+  --border:                hsl(220, 13%, 91%);
+  --input:                 hsl(220, 13%, 91%);
+  --ring:                  hsl(270, 33%, 50%);
+  --link:                  hsla(240, 100%, 50%, 1);
+  --link-foreground:       hsla(240, 100%, 50%, 1);
+  --nav-border:            hsla(187, 17%, 71%, 1);
+  --nav-border-light:      hsl(215, 50%, 91%);
+
+  /* ---------- Radii ---------- */
+  --radius:    0.5rem;     /* lg */
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: 0.75rem;    /* Cards */
+  --radius-full: 9999px;   /* Buttons, badges "rounded" */
+
+  /* ---------- Shadows (Tailwind defaults used in app) ---------- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow:    0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-primary: 0 0 12px 0 hsla(189, 100%, 42%, 0.35); /* login glow */
+
+  /* ---------- Brand gradient ---------- */
+  --gradient-burst: linear-gradient(to top left, var(--primary), var(--secondary));
+
+  /* ---------- Typography ---------- */
+  --font-sans: 'Sofia Pro', system-ui, -apple-system, sans-serif;
+
+  /* Heading sizes (mobile / desktop) — from Heading.tsx */
+  /* display */
+  --h-xxxl: clamp(32px, 3.4vw, 36px); /* @kind font */
+  --h-xxl:  clamp(24px, 2.6vw, 28px);                  /* @kind font */
+  /* page headers */
+  --h-xl:   clamp(18px, 2.0vw, 22px); /* @kind font */
+  /* default heading */
+  --h-lg:   clamp(16px, 1.6vw, 18px); /* @kind font */
+  --h-md:   clamp(14px, 1.4vw, 16px);                  /* @kind font */
+  --h-sm:   clamp(10px, 1.1vw, 12px);                  /* @kind font */
+
+  /* Paragraph sizes — from Paragraphs.tsx */
+  --p-xxl: 22px;
+  --p-xl:  20px;
+  --p-lg:  18px;
+  --p-md:  16px;  /* body default */
+  --p-sm:  14px;
+  --p-xs:  12px;
+
+  --fw-thin:    100;  /* @kind font */
+  --fw-regular: 400;  /* @kind font */
+  --fw-medium:  500;  /* @kind font */
+  --fw-semibold:600;  /* @kind font */
+  --fw-bold:    700;  /* @kind font */
+
+  --leading-tight:  1.15;  /* @kind font */
+  --leading-snug:   1.3;   /* @kind font */
+  --leading-normal: 1.5;   /* @kind font */
+
+  /* Spacing (Tailwind scale, only the ones the app uses most) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;  /* header height */
+  --space-16: 64px;  /* collapsed sidebar width */
+  --space-60: 240px; /* open sidebar width */
+}
+
+/* ---------- Semantic typographic elements ---------- */
+html, body {
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 { font-size: var(--h-xxxl); font-weight: var(--fw-semibold); letter-spacing: -0.01em; line-height: var(--leading-tight); color: var(--tertiary); }
+h2 { font-size: var(--h-xxl);  font-weight: var(--fw-semibold); letter-spacing: -0.01em; line-height: var(--leading-tight); color: var(--tertiary); }
+h3 { font-size: var(--h-xl);   font-weight: var(--fw-semibold); line-height: var(--leading-snug);  color: var(--tertiary); }
+h4 { font-size: var(--h-lg);   font-weight: var(--fw-semibold); line-height: var(--leading-snug);  color: var(--tertiary); }
+h5 { font-size: var(--h-md);   font-weight: var(--fw-medium);   line-height: var(--leading-snug);  color: var(--tertiary); }
+h6 { font-size: var(--h-sm);   font-weight: var(--fw-medium);   line-height: var(--leading-normal); color: var(--tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+
+p  { font-size: var(--p-md);   line-height: var(--leading-normal); color: var(--tertiary); }
+small{font-size: var(--p-xs);  color: var(--muted); }
+a  { color: var(--link-foreground); text-underline-offset: 3px; }
+a:hover { text-decoration: underline; }
+
+code, pre, kbd, samp {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}

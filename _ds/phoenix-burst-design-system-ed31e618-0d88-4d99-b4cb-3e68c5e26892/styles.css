@@ -1,0 +1,5 @@
+/* =====================================================
+   Phoenix Burst Design System — global entry stylesheet
+   Consumers link this ONE file to get every token + font.
+   ===================================================== */
+@import url('./colors_and_type.css');
